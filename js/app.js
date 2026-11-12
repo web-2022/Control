@@ -7,6 +7,7 @@ import * as M from './modelo.js';
 import * as V from './vistas.js';
 import * as MD from './modales.js';
 import { vistaDiario } from './diario.js';
+import { iniciarInstalacion, actualizarBotones } from './instalar.js';
 import { iniciarAuto, alCambiarEstado, sincronizar } from './sync.js';
 import { cargarDemo } from './demo.js';
 import { cerrarModalSuperior, hayModal, enSilencio, toast } from './ui.js';
@@ -64,6 +65,7 @@ function render(cambioDeRuta = false) {
   const base = { reunion: 'reuniones', persona: 'equipo', proyecto: 'proyectos' }[nombre] || nombre;
   document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes', 'diario'].includes(base))));
   actualizarContadores();
+  actualizarBotones();
 
   window.scrollTo(0, scroll);
   if (focoId) {
@@ -194,6 +196,7 @@ async function iniciar() {
   });
 
   enlazarAcciones();
+  iniciarInstalacion();
   window.addEventListener('hashchange', () => render(true));
   store.suscribir((tipo) => {
     if (tipo === 'cambio' && !enSilencio()) renderDiferido();

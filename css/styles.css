@@ -553,3 +553,12 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 .dia details summary { cursor: pointer; }
 .dia details ul { margin: 4px 0; padding-left: 18px; }
 @media (max-width: 860px) { .cierre-kpis b { font-size: 20px; } .vista-acc .btn span { display: inline; } }
+
+/* ---------------- Instalar app ---------------- */
+.btn-instalar { margin-left: auto; border-color: var(--acento); color: var(--acento); }
+.btn-instalar + .sync { margin-left: 0; }
+.aviso-instalar { background: var(--acento-suave); }
+.mas-instalar { background: var(--acento-suave); }
+.pasos-instalar { padding-left: 22px; margin: 4px 0 10px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.tecla { display: inline-block; padding: 0 7px; border: 1px solid var(--borde2); border-radius: 6px; background: var(--sup2); font-weight: 700; }
+@media (max-width: 860px) { .btn-instalar span { display: none; } .btn-instalar { padding: 0 9px; } }

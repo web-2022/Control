@@ -13,6 +13,7 @@ import { parsear } from './parser.js';
 import { escuchar, vozDisponible } from './voz.js';
 import { cargarDemo } from './demo.js';
 import { abrirCierreDia, cierreDe } from './diario.js';
+import { puedeInstalar, yaInstalada } from './instalar.js';
 import { toast, confirmar, copiar, descargar, modal, sinRefrescar, leerForm } from './ui.js';
 import { ic } from './iconos.js';
 import { esc, hoy, addDias, fmtFecha, fmtFechaLarga, diffDias, inicioSemana, agrupar, norm, debounce, uid, fechaLocal, fmtMomento } from './util.js';
@@ -84,6 +85,7 @@ export function vistaHoy() {
      <button class="btn btn-pri" data-cierre-dia>${ic('check')}<span>${cierreDe(H) ? 'Editar cierre' : 'Cierre del día'}</span></button>`)}
   ${new Date().getHours() >= 17 && !cierreDe(H) ? `<div class="aviso aviso-cierre">${ic('reloj')}<span><b>¿Terminando el día?</b> Haz tu cierre: revisa lo hecho, comenta y pasa lo pendiente a mañana.</span><button class="btn btn-mini btn-pri" data-cierre-dia>Cierre del día</button></div>` : ''}
   ${cfg.demo ? `<div class="aviso">${ic('campana')}<span>Estás viendo <b>datos de ejemplo</b>. Explora la app y cuando quieras empieza con los tuyos.</span><button class="btn btn-mini" data-borrar-demo>Borrar ejemplo y empezar</button></div>` : ''}
+  ${puedeInstalar() && !localStorage.getItem('control.ocultarInstalar') ? `<div class="aviso aviso-instalar">${ic('descargar')}<span><b>Instala Control en tu celular</b> para abrirla desde un ícono, a pantalla completa y sin internet.</span><button class="btn btn-mini btn-pri" data-instalar>Instalar</button><button class="icon-btn" data-ocultar-instalar title="No mostrar más">${ic('x')}</button></div>` : ''}
   ${capturaLinea('Captura rápida: “mañana 10am revisar CAPEX con @Ana #Huaylla”  (Enter)')}
   <div class="kpis">
     ${kpi(venc.length, 'Vencidos', '#/pendientes?rango=vencidos', venc.length ? 'kpi-rojo' : '', 'reloj')}
@@ -119,6 +121,9 @@ export function vistaHoy() {
     montar(el) {
       montarCapturaLinea(el);
       el.querySelectorAll('[data-cierre-dia]').forEach((b) => b.onclick = () => abrirCierreDia());
+      el.querySelector('[data-ocultar-instalar]')?.addEventListener('click', (e) => {
+        localStorage.setItem('control.ocultarInstalar', '1'); e.target.closest('.aviso').remove();
+      });
       el.querySelector('[data-borrar-demo]')?.addEventListener('click', async () => {
         if (await confirmar('Se borrarán los datos de ejemplo de este dispositivo. ¿Continuar?', 'Borrar y empezar', true)) {
           await store.vaciarTodo();
@@ -799,6 +804,12 @@ export function vistaAjustes() {
     </section>
 
     <section class="tarjeta">
+      <h3>${ic('descargar')} Instalar la app</h3>
+      <p class="nota">${yaInstalada() ? '✔ Estás usando la app instalada.' : 'Instálala en tu celular o PC para abrirla desde un ícono, a pantalla completa y sin internet.'}</p>
+      ${yaInstalada() ? '' : '<div class="botones-rapidos"><button class="btn btn-pri" data-instalar-ajustes>Instalar en este dispositivo</button></div>'}
+    </section>
+
+    <section class="tarjeta">
       <h3>${ic('campana')} Alertas</h3>
       <label class="check-linea"><input type="checkbox" id="aj-notif" ${cfg.notificaciones ? 'checked' : ''}> Notificaciones del navegador (vencimientos y reuniones)</label>
       <label class="campo campo-corto"><span>Avisar minutos antes</span><input type="number" id="aj-aviso" min="0" max="240" value="${esc(cfg.avisoMin)}"></label>
@@ -855,6 +866,7 @@ export function vistaAjustes() {
     titulo: 'Ajustes', html,
     montar(el, refrescar) {
       const $ = (s) => el.querySelector(s);
+      $('[data-instalar-ajustes]')?.addEventListener('click', () => import('./instalar.js').then((m) => m.instalar()));
       $('#aj-nombre').addEventListener('change', (e) => { store.guardarConfig({ miNombre: e.target.value.trim() }); toast('Nombre guardado'); });
       $('#aj-tema').addEventListener('change', (e) => { store.guardarConfig({ tema: e.target.value }); document.documentElement.dataset.tema = e.target.value; });
       $('#aj-voz').addEventListener('change', (e) => { localStorage.setItem('control.vozIdioma', e.target.value); toast('Idioma de dictado guardado'); });
@@ -967,6 +979,7 @@ export function vistaMas() {
     titulo: 'Más',
     html: `${cab('Más')}
     <div class="mas-lista">
+      ${yaInstalada() ? '' : `<a class="mas-item mas-instalar" href="#" data-instalar>${ic('descargar')}<div><b>Instalar app en el celular</b><span>Ícono en tu pantalla, pantalla completa, sin internet</span></div>${ic('flecha')}</a>`}
       ${it('#/equipo', 'equipo', 'Equipo', 'Carga de trabajo y 1:1')}
       ${it('#/proyectos', 'proyecto', 'Proyectos', 'Fases, hitos y entregables')}
       ${it('#/pendientes?vista=esperando', 'espera', 'Esperando a', 'Lo que delegaste')}
