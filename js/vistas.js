@@ -784,9 +784,9 @@ export function vistaAjustes() {
 
     <section class="tarjeta">
       <h3>${ic('sync')} Google Sheets</h3>
-      <p class="nota">Tus datos siempre se guardan en este dispositivo. Conecta tu Google Sheet para tener respaldo y usar la app en celular y PC a la vez. Guía paso a paso en el <a href="https://github.com/web-2022/control#readme" target="_blank" rel="noopener">README</a>.</p>
-      <label class="campo"><span>URL del Web App (termina en /exec)</span><input id="aj-url" value="${esc(cfg.apiUrl)}" placeholder="https://script.google.com/macros/s/…/exec"></label>
-      <label class="campo"><span>Token secreto</span><input id="aj-token" type="password" value="${esc(cfg.token)}" autocomplete="off"></label>
+      <p class="nota">Tus datos siempre se guardan en este dispositivo. Conecta tu Google Sheet para tener respaldo y usar la app en celular y PC a la vez. Guía paso a paso en el <a href="https://github.com/web-2022/Control#readme" target="_blank" rel="noopener">README</a>.</p>
+      <label class="campo"><span>URL del Web App (termina en /exec)</span><input id="aj-url" name="control-api-url" type="url" autocomplete="off" spellcheck="false" value="${esc(cfg.apiUrl)}" placeholder="https://script.google.com/macros/s/…/exec"></label>
+      <label class="campo"><span>Token secreto</span><input id="aj-token" name="control-api-token" type="text" class="campo-secreto" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false" value="${esc(cfg.token)}" placeholder="Pega aquí tu token"></label>
       <div class="botones-rapidos">
         <button class="btn" data-probar>Probar conexión</button>
         <button class="btn btn-pri" data-guardar-con>Guardar y sincronizar</button>

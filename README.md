@@ -3,7 +3,7 @@
 App web (PWA) para gestionar proyectos de ingeniería minera sin que se pase nada: **captura rápida por voz**, pendientes con responsable y fecha, reuniones con minuta y acuerdos convertidos en acciones, seguimiento del equipo y revisión semanal.
 Los datos se guardan en tu dispositivo (funciona sin internet) y se sincronizan con **tu Google Sheet**.
 
-**App:** https://web-2022.github.io/control/
+**App:** https://web-2022.github.io/Control/
 
 ---
 
@@ -57,7 +57,7 @@ La primera vez la app se abre con **datos de ejemplo** para que la explores. Bó
 
 1. En el repositorio: **Settings → Pages**.
 2. *Source:* **Deploy from a branch** · *Branch:* `main` · carpeta `/ (root)` → **Save**.
-3. En 1–2 minutos estará en `https://web-2022.github.io/control/`.
+3. En 1–2 minutos estará en `https://web-2022.github.io/Control/`.
 
 ### 2. Crear la base de datos en Google Sheets
 

@@ -499,3 +499,7 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Token: texto oculto sin que Chrome lo trate como contraseña (evita el autocompletado) */
+.campo-secreto { -webkit-text-security: disc; }
+.campo-secreto:focus { -webkit-text-security: none; }
