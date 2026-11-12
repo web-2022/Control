@@ -1,0 +1,24 @@
+{
+  "name": "Control – Seguimiento de pendientes y reuniones",
+  "short_name": "Control",
+  "description": "Captura rápida por voz, control de pendientes, reuniones, acuerdos y equipo para gestión de proyectos de ingeniería minera.",
+  "lang": "es",
+  "start_url": "./#/hoy",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f141a",
+  "theme_color": "#0f141a",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Capturar por voz", "short_name": "Voz", "url": "./?voz=1#/hoy", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Captura rápida", "short_name": "Capturar", "url": "./?capturar=1#/hoy", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Inbox", "url": "./#/inbox", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Reuniones", "url": "./#/reuniones", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
