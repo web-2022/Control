@@ -100,3 +100,19 @@ export const debounce = (fn, ms) => {
     t = setTimeout(() => fn(...a), ms);
   };
 };
+
+/** Fecha local 'AAAA-MM-DD' de una marca de tiempo ISO (p. ej. cerrado, comentarios). */
+export const fechaLocal = (iso) => (iso ? ymd(new Date(iso)) : '');
+
+/** Siguiente día hábil (salta sábado y domingo). */
+export const siguienteHabil = (s) => {
+  let f = addDias(s, 1);
+  while ([0, 6].includes(parseYmd(f).getDay())) f = addDias(f, 1);
+  return f;
+};
+
+/** '12/11 18:30' */
+export const fmtMomento = (iso) => {
+  const d = new Date(iso);
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};

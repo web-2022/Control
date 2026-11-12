@@ -25,15 +25,17 @@ var HOJAS = {
   reuniones: 'Reuniones',
   acuerdos: 'Acuerdos',
   personas: 'Personas',
-  proyectos: 'Proyectos'
+  proyectos: 'Proyectos',
+  diario: 'Diario'
 };
 // Columnas que van primero (el resto se agrega solo cuando aparece un campo nuevo)
 var COLUMNAS_BASE = {
-  pendientes: ['id', 'titulo', 'estado', 'prioridad', 'fecha', 'hora', 'responsable', 'proyectoId', 'disciplina', 'fase', 'origen', 'solicitante', 'descripcion', 'notas', 'inbox', 'reunionId', 'creado', 'cerrado', 'historial', 'deleted', 'updatedAt', '_srv'],
+  pendientes: ['id', 'titulo', 'estado', 'prioridad', 'fecha', 'hora', 'responsable', 'proyectoId', 'disciplina', 'fase', 'origen', 'solicitante', 'descripcion', 'notas', 'comentarios', 'inbox', 'reunionId', 'creado', 'cerrado', 'historial', 'deleted', 'updatedAt', '_srv'],
   reuniones: ['id', 'titulo', 'fecha', 'hora', 'duracion', 'proyectoId', 'participantes', 'objetivo', 'minuta', 'estado', 'enlace', 'creado', 'deleted', 'updatedAt', '_srv'],
   acuerdos: ['id', 'reunionId', 'texto', 'responsable', 'fecha', 'pendienteId', 'creado', 'deleted', 'updatedAt', '_srv'],
   personas: ['id', 'nombre', 'rol', 'disciplina', 'email', 'telefono', 'empresa', 'creado', 'deleted', 'updatedAt', '_srv'],
-  proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_srv']
+  proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_srv'],
+  diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_srv']
 };
 
 // ------------------------------------------------------------

@@ -60,11 +60,12 @@ export function toast(msg, accion, ms = 3500) {
   const cont = document.getElementById('toasts');
   const t = document.createElement('div');
   t.className = 'toast';
-  t.innerHTML = `<span>${esc(msg)}</span>${accion ? `<button class="toast-acc">${esc(accion.texto)}</button>` : ''}`;
+  const acciones = accion ? (Array.isArray(accion) ? accion : [accion]) : [];
+  t.innerHTML = `<span>${esc(msg)}</span>${acciones.map((a, i) => `<button class="toast-acc" data-i="${i}">${esc(a.texto)}</button>`).join('')}`;
   cont.appendChild(t);
   requestAnimationFrame(() => t.classList.add('visible'));
   const quitar = () => { t.classList.remove('visible'); setTimeout(() => t.remove(), 200); };
-  if (accion) t.querySelector('.toast-acc').addEventListener('click', () => { accion.fn(); quitar(); });
+  t.querySelectorAll('.toast-acc').forEach((b) => b.addEventListener('click', () => { acciones[b.dataset.i].fn(); quitar(); }));
   setTimeout(quitar, ms);
 }
 

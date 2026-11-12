@@ -7,7 +7,7 @@ import { parsear } from './parser.js';
 import { escuchar, vozDisponible } from './voz.js';
 import { modal, toast, confirmar, leerForm } from './ui.js';
 import { ic } from './iconos.js';
-import { esc, hoy, addDias, fmtFecha, uid } from './util.js';
+import { esc, hoy, addDias, fmtFecha, uid, fmtMomento } from './util.js';
 import { COLORES, FASES, ENTREGABLES_TIPICOS } from './catalogo.js';
 import * as C from './componentes.js';
 
@@ -21,7 +21,10 @@ export async function alternarHecho(id) {
   const cerrando = !(previo === 'Hecho' || previo === 'Cancelado');
   await store.guardar('pendientes', { id, estado: cerrando ? 'Hecho' : 'Pendiente', inbox: false });
   if (cerrando) {
-    toast(`✓ ${p.titulo}`, { texto: 'Deshacer', fn: () => store.guardar('pendientes', { id, estado: previo }) });
+    toast(`✓ ${p.titulo}`, [
+      { texto: 'Comentar', fn: () => comentar(id, { cierre: true }) },
+      { texto: 'Deshacer', fn: () => store.guardar('pendientes', { id, estado: previo }) },
+    ], 6000);
   }
 }
 
@@ -72,6 +75,87 @@ export async function crearDesdeTexto(texto, extra = {}) {
   // Va a la bandeja si le falta información clave
   if (p.inbox === undefined) p.inbox = !(p.fecha && (p.proyectoId || p.responsable));
   return store.guardar('pendientes', p);
+}
+
+// ============================================================
+// DICTADO EN UN CAMPO DE TEXTO (comentarios, cierre del día)
+// ============================================================
+/** Conecta un botón de micrófono para dictar dentro de un textarea/input. */
+export function enlazarDictado(boton, campo, op = {}) {
+  let detener = null;
+  if (!vozDisponible()) { boton.title = 'Dictado no disponible: usa el micrófono del teclado'; }
+  boton.addEventListener('click', () => {
+    if (!vozDisponible()) { toast('Usa el micrófono del teclado de tu celular'); campo.focus(); return; }
+    if (detener) { detener(); return; }
+    const base = campo.value.trim();
+    boton.classList.add('escuchando');
+    detener = escuchar({
+      continuo: !!op.continuo,
+      onParcial: (t) => { campo.value = (base ? base + ' ' : '') + t; campo.dispatchEvent(new Event('input')); },
+      onError: (m) => toast(m),
+      onFin: () => { detener = null; boton.classList.remove('escuchando'); campo.focus(); },
+    });
+  });
+  return () => detener?.();
+}
+
+// ============================================================
+// COMENTARIOS (bitácora con fecha y hora)
+// ============================================================
+const listaComentarios = (p) => {
+  const cs = M.comentarios(p);
+  if (!cs.length) return '<li class="com-vacio">Aún no hay comentarios.</li>';
+  return [...cs].reverse().map((c) => `<li><time>${esc(fmtMomento(c.t))}</time><span>${esc(c.texto)}</span></li>`).join('');
+};
+const bloqueComentarios = (p, placeholder = 'Escribe o dicta el avance…') => `
+  <div class="comentarios">
+    <div class="com-nuevo">
+      <textarea class="com-texto" rows="2" placeholder="${esc(placeholder)}"></textarea>
+      <div class="com-acc">
+        <button type="button" class="btn btn-mini com-mic" title="Dictar">${ic('mic')} Dictar</button>
+        <button type="button" class="btn btn-mini btn-pri com-agregar">${ic('mas2')} Agregar comentario</button>
+      </div>
+    </div>
+    <ul class="com-lista">${listaComentarios(p)}</ul>
+  </div>`;
+function montarComentarios(el, id, alAgregar) {
+  const ta = el.querySelector('.com-texto');
+  const lista = el.querySelector('.com-lista');
+  const parar = enlazarDictado(el.querySelector('.com-mic'), ta);
+  const agregar = async () => {
+    if (!ta.value.trim()) { ta.focus(); return false; }
+    parar();
+    const p = await M.agregarComentario(id, ta.value);
+    ta.value = '';
+    lista.innerHTML = listaComentarios(p);
+    toast('Comentario guardado');
+    alAgregar?.();
+    return true;
+  };
+  el.querySelector('.com-agregar').addEventListener('click', agregar);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); agregar(); } });
+  return { agregar, pendiente: () => ta.value.trim(), parar };
+}
+
+/** Ventana rápida para comentar un pendiente (también al cerrarlo). */
+export function comentar(id, op = {}) {
+  const p = store.obtener('pendientes', id);
+  if (!p) return;
+  modal(op.cierre ? 'Comentario de cierre' : 'Agregar comentario', `
+    <p class="com-tit">${esc(p.titulo)}</p>
+    ${bloqueComentarios(p, op.cierre ? '¿Cómo se cerró? (ej.: “Enviado al cliente, aprobado por Juan”)' : 'Escribe o dicta el avance…')}
+    <div class="acciones-modal">
+      ${M.esAbierto(p) ? `<button type="button" class="btn" data-hecho>${ic('check')} Marcar hecho</button>` : ''}
+      <span class="sep"></span>
+      <button type="button" class="btn" data-cerrar>Cerrar</button>
+    </div>`, (el, cerrar) => {
+    const c = montarComentarios(el, id, () => { if (op.cierre) cerrar(); });
+    el.querySelector('.com-texto').focus();
+    el.querySelector('[data-hecho]')?.addEventListener('click', async () => {
+      if (c.pendiente()) await c.agregar();
+      await alternarHecho(id); cerrar();
+    });
+  });
 }
 
 // ============================================================
@@ -207,7 +291,8 @@ export function editarPendiente(id, defecto = {}) {
       <label class="campo"><span>Origen</span><select name="origen">${C.optsOrigen(p.origen)}</select></label>
     </div>
     <label class="campo campo-full"><span>Descripción</span><textarea name="descripcion" rows="2">${esc(p.descripcion || '')}</textarea></label>
-    <label class="campo campo-full"><span>Notas / avance</span><textarea name="notas" rows="2">${esc(p.notas || '')}</textarea></label>
+    <label class="campo campo-full"><span>Notas generales</span><textarea name="notas" rows="2">${esc(p.notas || '')}</textarea></label>
+    ${id ? `<div class="campo campo-full"><span>Comentarios y avances (${M.comentarios(p).length})</span>${bloqueComentarios(p)}</div>` : ''}
     <label class="check-linea"><input type="checkbox" name="inbox" ${p.inbox ? 'checked' : ''}> Dejar en Inbox (por clasificar)</label>
     ${reunion ? `<p class="nota">Origen: reunión <a href="#/reunion/${esc(reunion.id)}" data-cerrar>${esc(reunion.titulo)} (${esc(fmtFecha(reunion.fecha))})</a></p>` : ''}
     ${p.textoOriginal ? `<p class="nota">Captura original: “${esc(p.textoOriginal)}”</p>` : ''}
@@ -232,17 +317,22 @@ export function editarPendiente(id, defecto = {}) {
       const pr = M.proyecto(f.proyectoId.value);
       if (pr?.fase && !f.fase.value) f.fase.value = pr.fase;
     });
+    const com = id ? montarComentarios(el, id) : null;
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
       const d = leerForm(f);
       if (!d.titulo) return;
+      if (com?.pendiente()) await com.agregar(); // no perder un comentario escrito sin pulsar "Agregar"
       await store.guardar('pendientes', { ...(id ? { id } : defecto), ...d });
       toast('Guardado');
       cerrar();
     });
     el.querySelectorAll('[data-pos]').forEach((b) => b.onclick = async () => { await posponer(id, Number(b.dataset.pos)); cerrar(); });
     el.querySelector('[data-hoy]')?.addEventListener('click', async () => { await store.guardar('pendientes', { id, fecha: hoy(), inbox: false }); toast('Movido a hoy'); cerrar(); });
-    el.querySelector('[data-hecho]')?.addEventListener('click', async () => { await alternarHecho(id); cerrar(); });
+    el.querySelector('[data-hecho]')?.addEventListener('click', async () => {
+      if (com?.pendiente()) await com.agregar();
+      await alternarHecho(id); cerrar();
+    });
     el.querySelector('[data-borrar]')?.addEventListener('click', async () => {
       if (await confirmar('¿Eliminar este pendiente?', 'Eliminar', true)) {
         await store.borrar('pendientes', id);

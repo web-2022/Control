@@ -89,6 +89,14 @@ export async function cargarDemo() {
   ];
 
   for (const p of pendientes) p.fase = proyectos.find((x) => x.id === p.proyectoId)?.fase || '';
+  // Comentarios de avance de ejemplo
+  const t = (dias, hh) => { const f = new Date(); f.setDate(f.getDate() + dias); f.setHours(hh, 15, 0, 0); return f.toISOString(); };
+  pendientes[1].comentarios = [
+    { t: t(-4, 10), texto: 'Se pidió por correo al área de medio ambiente del cliente.' },
+    { t: t(-1, 16), texto: 'Recordé por WhatsApp; ofrecen enviarlo esta semana.' },
+  ];
+  pendientes[2].comentarios = [{ t: t(0, 11), texto: 'Cut-off actualizado a 4.2 % ZnEq; falta correr la secuencia de los tajeos del nivel 3.' }];
+  pendientes[6].comentarios = [{ t: t(-1, 9), texto: 'Bloqueado: el cliente aún no entrega el logueo geotécnico de los sondajes 2025.' }];
 
   const acuerdos = [
     { id: uid(), reunionId: reuniones[4].id, texto: 'Validar dilución con geomecánica', responsable: maria, fecha: d(-2), pendienteId: pendientes[0].id },
@@ -102,5 +110,12 @@ export async function cargarDemo() {
   await store.guardarVarios('reuniones', reuniones);
   await store.guardarVarios('pendientes', pendientes);
   await store.guardarVarios('acuerdos', acuerdos);
+  await store.guardarVarios('diario', [{
+    id: `dia-${d(-1)}`, fecha: d(-1),
+    comentario: 'Día cargado de reuniones con el cliente. Se definió el método de minado base; el riesgo principal sigue siendo la data geotécnica pendiente. Mañana priorizar la secuencia de minado.',
+    hechos: [{ id: pendientes[13].id, titulo: pendientes[13].titulo }],
+    avances: [{ id: pendientes[1].id, titulo: pendientes[1].titulo, texto: 'Recordé por WhatsApp; ofrecen enviarlo esta semana.' }],
+    movidos: [], quedaron: [], pendientesAbiertos: 13,
+  }]);
   store.guardarConfig({ demo: true });
 }

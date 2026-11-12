@@ -3,7 +3,7 @@
 // qué estoy esperando de otros, orden de prioridad, etc.
 // ============================================================
 import * as store from './store.js';
-import { hoy, addDias, diffDias, inicioSemana } from './util.js';
+import { hoy, addDias, diffDias, inicioSemana, fechaLocal, nowIso } from './util.js';
 import { ESTADOS_ABIERTOS, DISCIPLINAS } from './catalogo.js';
 
 export const esAbierto = (p) => ESTADOS_ABIERTOS.includes(p.estado || 'Pendiente');
@@ -62,8 +62,8 @@ export function indicadores() {
   const ab = todos.filter(esAbierto);
   // Cumplimiento: cerrados en los últimos 30 días que se cerraron a tiempo
   const hace30 = addDias(H, -30);
-  const cerrados = todos.filter((p) => p.estado === 'Hecho' && p.cerrado && p.cerrado.slice(0, 10) >= hace30);
-  const aTiempo = cerrados.filter((p) => !p.fecha || p.cerrado.slice(0, 10) <= p.fecha);
+  const cerrados = todos.filter((p) => p.estado === 'Hecho' && p.cerrado && fechaLocal(p.cerrado) >= hace30);
+  const aTiempo = cerrados.filter((p) => !p.fecha || fechaLocal(p.cerrado) <= p.fecha);
   // Antigüedad de los abiertos (días desde que se crearon)
   const buckets = { '0–7 d': 0, '8–14 d': 0, '15–30 d': 0, '> 30 d': 0 };
   for (const p of ab) {
@@ -79,7 +79,7 @@ export function indicadores() {
     vencidos: ab.filter((p) => esVencido(p, H)).length,
     hoy: ab.filter((p) => esDeHoy(p, H)).length,
     esperando: ab.filter(esEsperando).length,
-    cerradosSemana: todos.filter((p) => p.estado === 'Hecho' && p.cerrado && p.cerrado.slice(0, 10) >= semana).length,
+    cerradosSemana: todos.filter((p) => p.estado === 'Hecho' && p.cerrado && fechaLocal(p.cerrado) >= semana).length,
     cumplimiento: cerrados.length ? Math.round((aTiempo.length / cerrados.length) * 100) : null,
     cerrados30: cerrados.length,
     antiguedad: buckets,
@@ -93,5 +93,29 @@ export function indicadores() {
       abiertos: ab.filter((p) => (p.responsable || '') === pe.id).length,
       vencidos: ab.filter((p) => (p.responsable || '') === pe.id && esVencido(p, H)).length,
     })).filter((x) => x.abiertos),
+  };
+}
+
+// ---------------- Comentarios (bitácora de avance) ----------------
+export const comentarios = (p) => (Array.isArray(p?.comentarios) ? p.comentarios : []);
+export const ultimoComentario = (p) => { const c = comentarios(p); return c.length ? c[c.length - 1] : null; };
+
+/** Agrega un comentario con fecha y hora a un pendiente. */
+export async function agregarComentario(id, texto) {
+  const t = (texto || '').trim();
+  if (!t) return null;
+  const p = store.obtener('pendientes', id);
+  if (!p) return null;
+  const lista = [...comentarios(p), { t: nowIso(), texto: t }].slice(-100);
+  return store.guardar('pendientes', { id, comentarios: lista });
+}
+
+/** Todo lo ocurrido en una fecha: cerrados, avances y lo que quedó abierto. */
+export function resumenDia(fecha = hoy()) {
+  const todos = pendientes();
+  return {
+    cerrados: todos.filter((p) => p.estado === 'Hecho' && fechaLocal(p.cerrado) === fecha),
+    avances: todos.flatMap((p) => comentarios(p).filter((c) => fechaLocal(c.t) === fecha).map((c) => ({ p, c }))),
+    quedan: abiertos().filter((p) => p.fecha && p.fecha <= fecha).sort(ordenar),
   };
 }

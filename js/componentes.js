@@ -1,7 +1,7 @@
 // ============================================================
 // componentes.js — Fragmentos HTML reutilizables (filas, chips, selects).
 // ============================================================
-import { esc, fmtFecha, hoy } from './util.js';
+import { esc, fmtFecha, hoy, fmtMomento } from './util.js';
 import { ic } from './iconos.js';
 import * as M from './modelo.js';
 import { ESTADOS, PRIORIDADES, ORIGENES, FASES } from './catalogo.js';
@@ -26,8 +26,10 @@ export function filaPendiente(p, op = {}) {
     <div class="fila-cuerpo" data-acc="abrir" data-id="${esc(p.id)}" tabindex="0" role="button">
       <div class="fila-tit">${p.prioridad === 'alta' ? `<span class="flag" title="Prioridad alta">${ic('bandera')}</span>` : ''}${esc(p.titulo || '(sin título)')}</div>
       ${chips.length ? `<div class="fila-meta">${chips.join('')}</div>` : ''}
+      ${!op.compacto && M.ultimoComentario(p) ? `<div class="fila-com" title="${M.comentarios(p).length} comentarios">${ic('lista')}<time>${esc(fmtMomento(M.ultimoComentario(p).t))}</time><span>${esc(M.ultimoComentario(p).texto)}</span>${M.comentarios(p).length > 1 ? `<b>+${M.comentarios(p).length - 1}</b>` : ''}</div>` : ''}
     </div>
     ${hecho || op.sinPosponer ? '' : `<div class="fila-acc">
+      <button class="mini" data-acc="comentar" data-id="${esc(p.id)}" title="Agregar comentario / avance">${ic('lista')}</button>
       <button class="mini" data-acc="posponer" data-dias="1" data-id="${esc(p.id)}" title="Posponer 1 día">+1d</button>
       <button class="mini" data-acc="posponer" data-dias="7" data-id="${esc(p.id)}" title="Posponer 1 semana">+1s</button>
     </div>`}

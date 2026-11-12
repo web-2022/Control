@@ -12,9 +12,10 @@ import { sincronizar, llamarApi, estadoSync } from './sync.js';
 import { parsear } from './parser.js';
 import { escuchar, vozDisponible } from './voz.js';
 import { cargarDemo } from './demo.js';
+import { abrirCierreDia, cierreDe } from './diario.js';
 import { toast, confirmar, copiar, descargar, modal, sinRefrescar, leerForm } from './ui.js';
 import { ic } from './iconos.js';
-import { esc, hoy, addDias, fmtFecha, fmtFechaLarga, diffDias, inicioSemana, agrupar, norm, debounce, uid } from './util.js';
+import { esc, hoy, addDias, fmtFecha, fmtFechaLarga, diffDias, inicioSemana, agrupar, norm, debounce, uid, fechaLocal, fmtMomento } from './util.js';
 import { ESTADOS, ESTADOS_ABIERTOS } from './catalogo.js';
 
 // ============================================================
@@ -79,7 +80,9 @@ export function vistaHoy() {
 
   const html = `
   ${cab(`${bienvenida()}${cfg.miNombre ? ', ' + esc(cfg.miNombre.split(' ')[0]) : ''}`, esc(fmtFechaLarga(H)),
-    `<a class="btn" href="#/revision">${ic('revision')}<span class="solo-desk">Revisión semanal</span></a>`)}
+    `<a class="btn" href="#/revision">${ic('revision')}<span class="solo-desk">Revisión semanal</span></a>
+     <button class="btn btn-pri" data-cierre-dia>${ic('check')}<span>${cierreDe(H) ? 'Editar cierre' : 'Cierre del día'}</span></button>`)}
+  ${new Date().getHours() >= 17 && !cierreDe(H) ? `<div class="aviso aviso-cierre">${ic('reloj')}<span><b>¿Terminando el día?</b> Haz tu cierre: revisa lo hecho, comenta y pasa lo pendiente a mañana.</span><button class="btn btn-mini btn-pri" data-cierre-dia>Cierre del día</button></div>` : ''}
   ${cfg.demo ? `<div class="aviso">${ic('campana')}<span>Estás viendo <b>datos de ejemplo</b>. Explora la app y cuando quieras empieza con los tuyos.</span><button class="btn btn-mini" data-borrar-demo>Borrar ejemplo y empezar</button></div>` : ''}
   ${capturaLinea('Captura rápida: “mañana 10am revisar CAPEX con @Ana #Huaylla”  (Enter)')}
   <div class="kpis">
@@ -115,6 +118,7 @@ export function vistaHoy() {
     titulo: 'Hoy', html,
     montar(el) {
       montarCapturaLinea(el);
+      el.querySelectorAll('[data-cierre-dia]').forEach((b) => b.onclick = () => abrirCierreDia());
       el.querySelector('[data-borrar-demo]')?.addEventListener('click', async () => {
         if (await confirmar('Se borrarán los datos de ejemplo de este dispositivo. ¿Continuar?', 'Borrar y empezar', true)) {
           await store.vaciarTodo();
@@ -277,7 +281,7 @@ export function vistaPendientes() {
     const cols = [...ESTADOS_ABIERTOS, 'Hecho'];
     const hace7 = addDias(H, -7);
     contenido = `<div class="kanban">${cols.map((e) => {
-      const items = (e === 'Hecho' ? M.pendientes().filter((p) => p.estado === 'Hecho' && (p.cerrado || '').slice(0, 10) >= hace7 && pasaFiltrosSinEstado(p)) : lista.filter((p) => (p.estado || 'Pendiente') === e));
+      const items = (e === 'Hecho' ? M.pendientes().filter((p) => p.estado === 'Hecho' && fechaLocal(p.cerrado) >= hace7 && pasaFiltrosSinEstado(p)) : lista.filter((p) => (p.estado || 'Pendiente') === e));
       return `<div class="kcol" data-estado="${esc(e)}">
         <h3 class="kcol-tit est-${esc(e.split(' ')[0].toLowerCase())}">${esc(e)}<span class="contador">${items.length}</span></h3>
         <div class="kcol-cuerpo">${items.map((p) => C.filaPendiente(p, { arrastrable: true, compacto: true, sinPosponer: true })).join('') || '<div class="vacio vacio-mini">Arrastra aquí</div>'}</div>
@@ -586,7 +590,7 @@ export function vistaPersona(id) {
   const venc = ab.filter((x) => M.esVencido(x, H));
   const prox = ab.filter((x) => !M.esVencido(x, H) && x.fecha);
   const sinF = ab.filter((x) => !x.fecha);
-  const cerr = mios.filter((x) => x.estado === 'Hecho' && (x.cerrado || '').slice(0, 10) >= addDias(H, -14)).sort((a, b) => (b.cerrado || '').localeCompare(a.cerrado || ''));
+  const cerr = mios.filter((x) => x.estado === 'Hecho' && fechaLocal(x.cerrado) >= addDias(H, -14)).sort((a, b) => (b.cerrado || '').localeCompare(a.cerrado || ''));
   const agenda = `Agenda 1:1 con ${p.nombre} — ${fmtFecha(H)}\n\n`
     + (venc.length ? `VENCIDOS\n${venc.map((x) => `• ${x.titulo} (venció ${fmtFecha(x.fecha)})`).join('\n')}\n\n` : '')
     + (prox.length ? `PRÓXIMOS\n${prox.map((x) => `• ${x.titulo} (${fmtFecha(x.fecha)})`).join('\n')}\n\n` : '')
@@ -819,6 +823,7 @@ export function vistaAjustes() {
         <button class="btn" data-csv="reuniones">Reuniones (CSV)</button>
         <button class="btn" data-csv="acuerdos">Acuerdos (CSV)</button>
         <button class="btn" data-csv="proyectos">Hitos de proyectos (CSV)</button>
+        <button class="btn" data-csv="diario">Diario (CSV)</button>
       </div>
       <div class="botones-rapidos">
         <button class="btn" data-json>${ic('descargar')} Respaldo completo (JSON)</button>
@@ -932,14 +937,19 @@ function exportarCSV(tabla) {
   };
   let filas = [];
   if (tabla === 'pendientes') {
-    filas = [['Título', 'Estado', 'Prioridad', 'Fecha', 'Hora', 'Responsable', 'Proyecto', 'Fase', 'Disciplina', 'Origen', 'Solicitante', 'Descripción', 'Notas', 'Inbox', 'Creado', 'Cerrado'],
-      ...M.pendientes().sort(M.ordenar).map((p) => [p.titulo, p.estado, p.prioridad, p.fecha, p.hora, M.nombrePersona(p.responsable), M.proyecto(p.proyectoId)?.nombre, p.fase, p.disciplina, p.origen, p.solicitante, p.descripcion, p.notas, p.inbox ? 'Sí' : '', (p.creado || '').slice(0, 10), (p.cerrado || '').slice(0, 10)])];
+    filas = [['Título', 'Estado', 'Prioridad', 'Fecha', 'Hora', 'Responsable', 'Proyecto', 'Fase', 'Disciplina', 'Origen', 'Solicitante', 'Descripción', 'Notas', 'Comentarios', 'Inbox', 'Creado', 'Cerrado'],
+      ...M.pendientes().sort(M.ordenar).map((p) => [p.titulo, p.estado, p.prioridad, p.fecha, p.hora, M.nombrePersona(p.responsable), M.proyecto(p.proyectoId)?.nombre, p.fase, p.disciplina, p.origen, p.solicitante, p.descripcion, p.notas, M.comentarios(p).map((c) => `[${fmtMomento(c.t)}] ${c.texto}`).join(' | '), p.inbox ? 'Sí' : '', (p.creado || '').slice(0, 10), fechaLocal(p.cerrado)])];
   } else if (tabla === 'reuniones') {
     filas = [['Título', 'Fecha', 'Hora', 'Duración', 'Proyecto', 'Participantes', 'Objetivo', 'Estado', 'Minuta'],
       ...store.todos('reuniones').sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')).map((r) => [r.titulo, r.fecha, r.hora, r.duracion, M.proyecto(r.proyectoId)?.nombre, (r.participantes || []).map(M.nombrePersona).join(', '), r.objetivo, r.estado, r.minuta])];
   } else if (tabla === 'acuerdos') {
     filas = [['Reunión', 'Fecha reunión', 'Acuerdo', 'Responsable', 'Fecha compromiso', 'Estado de la acción'],
       ...store.todos('acuerdos').map((a) => { const r = store.obtener('reuniones', a.reunionId); return [r?.titulo, r?.fecha, a.texto, M.nombrePersona(a.responsable), a.fecha, store.obtener('pendientes', a.pendienteId)?.estado || 'Sin acción']; })];
+  } else if (tabla === 'diario') {
+    filas = [['Fecha', 'Comentario del día', 'Cerrados', 'Avances', 'Movidos', 'Quedaron sin mover'],
+      ...store.todos('diario').sort((a, b) => a.fecha.localeCompare(b.fecha)).map((d) => [d.fecha, d.comentario,
+        (d.hechos || []).map((x) => x.titulo).join(' | '), (d.avances || []).map((x) => `${x.titulo}: ${x.texto}`).join(' | '),
+        (d.movidos || []).map((x) => `${x.titulo} → ${x.a}`).join(' | '), (d.quedaron || []).map((x) => x.titulo).join(' | ')])];
   } else if (tabla === 'proyectos') {
     filas = [['Proyecto', 'Cliente', 'Fase', 'Avance %', 'Entregable', 'Disciplina', 'Fecha', 'Hecho'],
       ...M.proyectos().flatMap((p) => (p.hitos?.length ? p.hitos : [{}]).map((h) => [p.nombre, p.cliente, p.fase, p.avance, h.nombre, h.disciplina, h.fecha, h.hecho ? 'Sí' : '']))];
@@ -960,6 +970,7 @@ export function vistaMas() {
       ${it('#/equipo', 'equipo', 'Equipo', 'Carga de trabajo y 1:1')}
       ${it('#/proyectos', 'proyecto', 'Proyectos', 'Fases, hitos y entregables')}
       ${it('#/pendientes?vista=esperando', 'espera', 'Esperando a', 'Lo que delegaste')}
+      ${it('#/diario', 'lista', 'Diario', 'Tus cierres del día')}
       ${it('#/revision', 'revision', 'Revisión semanal', 'Que no se pase nada')}
       ${it('#/ajustes', 'ajustes', 'Ajustes', 'Google Sheets, alertas, respaldo')}
     </div>`,

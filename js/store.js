@@ -10,7 +10,7 @@
 // ============================================================
 import { uid, nowIso } from './util.js';
 
-export const TABLAS = ['pendientes', 'reuniones', 'acuerdos', 'personas', 'proyectos'];
+export const TABLAS = ['pendientes', 'reuniones', 'acuerdos', 'personas', 'proyectos', 'diario'];
 
 const DB_NOMBRE = 'control-db';
 const CLAVE_CONFIG = 'control.config';
@@ -23,7 +23,7 @@ const oyentes = new Set();
 // ---------------- IndexedDB (envoltorio mínimo) ----------------
 function abrirDB() {
   return new Promise((ok, mal) => {
-    const req = indexedDB.open(DB_NOMBRE, 1);
+    const req = indexedDB.open(DB_NOMBRE, 2); // v2: tabla diario
     req.onupgradeneeded = () => {
       for (const t of TABLAS) if (!req.result.objectStoreNames.contains(t)) req.result.createObjectStore(t, { keyPath: 'id' });
     };

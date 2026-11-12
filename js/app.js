@@ -6,6 +6,7 @@ import * as store from './store.js';
 import * as M from './modelo.js';
 import * as V from './vistas.js';
 import * as MD from './modales.js';
+import { vistaDiario } from './diario.js';
 import { iniciarAuto, alCambiarEstado, sincronizar } from './sync.js';
 import { cargarDemo } from './demo.js';
 import { cerrarModalSuperior, hayModal, enSilencio, toast } from './ui.js';
@@ -28,6 +29,7 @@ const RUTAS = {
   proyectos: () => V.vistaProyectos(),
   proyecto: (id) => V.vistaProyecto(id),
   revision: () => V.vistaRevision(),
+  diario: () => vistaDiario(),
   ajustes: () => V.vistaAjustes(),
   mas: () => V.vistaMas(),
 };
@@ -60,7 +62,7 @@ function render(cambioDeRuta = false) {
 
   // Navegación activa
   const base = { reunion: 'reuniones', persona: 'equipo', proyecto: 'proyectos' }[nombre] || nombre;
-  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes'].includes(base))));
+  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes', 'diario'].includes(base))));
   actualizarContadores();
 
   window.scrollTo(0, scroll);
@@ -89,6 +91,7 @@ function enlazarAcciones() {
       if (acc === 'hecho') { e.preventDefault(); MD.alternarHecho(id); }
       else if (acc === 'abrir') { e.preventDefault(); MD.editarPendiente(id); }
       else if (acc === 'posponer') { e.preventDefault(); MD.posponer(id, Number(b.dataset.dias)); }
+      else if (acc === 'comentar') { e.preventDefault(); MD.comentar(id); }
       return;
     }
     const h = e.target.closest('[data-href]');
