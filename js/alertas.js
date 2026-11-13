@@ -132,7 +132,10 @@ export async function activarAvisos() {
   if (!('Notification' in window)) { toast('Este navegador no permite notificaciones. Usa “Agregar a mi calendario”.', null, 6000); return false; }
   const p = await Notification.requestPermission();
   if (p !== 'granted') {
-    toast('Las notificaciones quedaron bloqueadas. Actívalas en el candado de la barra de direcciones (o en Ajustes del teléfono → Apps → Chrome → Notificaciones).', null, 8000);
+    const instalada = window.matchMedia('(display-mode: standalone)').matches;
+    toast(instalada
+      ? 'El teléfono bloqueó las notificaciones de Control. Mantén presionado el ícono de Control → ⓘ Información de la app → Notificaciones → Permitir. Luego vuelve y pulsa “Activar avisos”.'
+      : 'Las notificaciones están bloqueadas. Toca el candado (o ⓘ) junto a la dirección → Permisos → Notificaciones → Permitir. Luego pulsa “Activar avisos”.', null, 12000);
     store.guardarConfig({ notificaciones: false });
     return false;
   }
