@@ -21,7 +21,10 @@ export async function conectarGoogle() {
     if (!ok) { G.cerrarSesion(); return null; }
     await store.vaciarTodo();
   } else if (cfg.demo) {
-    await store.vaciarTodo(); // no subir los datos de ejemplo a su hoja
+    // Puede haber datos de ejemplo mezclados con datos propios: preguntar, nunca borrar sin avisar
+    const borrar = await confirmar('Este dispositivo tiene los DATOS DE EJEMPLO (proyectos Huaylla, Ccollpa, L60…). ¿Borrar todo lo de este dispositivo antes de conectar? Si registraste datos tuyos aquí, elige “Cancelar”: se subirán a tu hoja (junto con los ejemplos, que luego puedes eliminar).', 'Borrar ejemplos', true);
+    if (borrar) await store.vaciarTodo();
+    else store.guardarConfig({ demo: false });
   }
   store.guardarConfig({
     modo: 'google', googleEmail: perfil.email, googleNombre: perfil.nombre,
