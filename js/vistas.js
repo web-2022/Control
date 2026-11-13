@@ -8,7 +8,9 @@ import * as store from './store.js';
 import * as M from './modelo.js';
 import * as C from './componentes.js';
 import * as MD from './modales.js';
-import { sincronizar, llamarApi, estadoSync } from './sync.js';
+import { sincronizar, llamarApi, estadoSync, encolarTodo } from './sync.js';
+import * as G from './google.js';
+import { conectarGoogle } from './bienvenida.js';
 import { parsear } from './parser.js';
 import { escuchar, vozDisponible } from './voz.js';
 import { cargarDemo } from './demo.js';
@@ -792,21 +794,32 @@ export function vistaAjustes() {
     </section>
 
     <section class="tarjeta">
-      <h3>${ic('sync')} Google Sheets</h3>
-      <p class="nota">Tus datos siempre se guardan en este dispositivo. Conecta tu Google Sheet para tener respaldo y usar la app en celular y PC a la vez. Guía paso a paso en el <a href="https://github.com/web-2022/Control#readme" target="_blank" rel="noopener">README</a>.</p>
+      <h3>${ic('sync')} Tus datos en Google</h3>
+      ${cfg.modo === 'google' ? `
+        <p class="nota">✔ Conectado con Google como <b>${esc(cfg.googleEmail)}</b>. Tus datos se guardan en la hoja <b>“Control – Mis datos”</b> de tu Google Drive.</p>
+        <div class="botones-rapidos">
+          ${cfg.sheetUrl ? `<a class="btn" href="${esc(cfg.sheetUrl)}" target="_blank" rel="noopener">Abrir mi hoja</a>` : ''}
+          <button class="btn btn-pri" data-sync-ahora>Sincronizar ahora</button>
+          <button class="btn btn-peligro-txt" data-salir>Cerrar sesión</button>
+        </div>` : `
+        <p class="nota">Tus datos siempre se guardan en este dispositivo. Inicia sesión con Google para tener respaldo en tu Drive y usar la app en celular y PC a la vez.</p>
+        <div class="botones-rapidos"><button class="btn btn-pri" data-google ${G.configurado() ? '' : 'disabled title="Configuración de Google pendiente"'}>${ic('usuario')} Continuar con Google</button></div>
+        ${cfg.apiUrl ? `<p class="nota">Ahora usas la conexión <b>avanzada (Apps Script)</b>. Si inicias sesión con Google, tus datos se copiarán a una hoja nueva “Control – Mis datos” y se usará esa.</p>` : ''}
+      `}
+      <p class="nota">Estado: <b>${esc(es.mensaje || es.estado)}</b>${cfg.lastSync ? ` · Última sincronización: ${esc(new Date(cfg.lastSync).toLocaleString('es-PE'))}` : ''}${es.pendientes ? ` · ${es.pendientes} cambios por subir` : ''}</p>
+      ${cfg.modo === 'google' ? '' : `<details class="avanzado" ${cfg.apiUrl ? 'open' : ''}><summary>Conexión avanzada con Apps Script</summary>
       <label class="campo"><span>URL del Web App (termina en /exec)</span><input id="aj-url" name="control-api-url" type="url" autocomplete="off" spellcheck="false" value="${esc(cfg.apiUrl)}" placeholder="https://script.google.com/macros/s/…/exec"></label>
       <label class="campo"><span>Token secreto</span><input id="aj-token" name="control-api-token" type="text" class="campo-secreto" autocomplete="off" data-lpignore="true" data-1p-ignore spellcheck="false" value="${esc(cfg.token)}" placeholder="Pega aquí tu token"></label>
       <div class="botones-rapidos">
         <button class="btn" data-probar>Probar conexión</button>
         <button class="btn btn-pri" data-guardar-con>Guardar y sincronizar</button>
-      </div>
-      <p class="nota">Estado: <b>${esc(es.mensaje || es.estado)}</b>${cfg.lastSync ? ` · Última sincronización: ${esc(new Date(cfg.lastSync).toLocaleString('es-PE'))}` : ''}${es.pendientes ? ` · ${es.pendientes} cambios por subir` : ''}</p>
+      </div></details>`}
     </section>
 
     <section class="tarjeta">
       <h3>${ic('descargar')} Instalar la app</h3>
       <p class="nota">${yaInstalada() ? '✔ Estás usando la app instalada.' : 'Instálala en tu celular o PC para abrirla desde un ícono, a pantalla completa y sin internet.'}</p>
-      ${yaInstalada() ? '' : '<div class="botones-rapidos"><button class="btn btn-pri" data-instalar-ajustes>Instalar en este dispositivo</button></div>'}
+      <div class="botones-rapidos">${yaInstalada() ? '' : '<button class="btn btn-pri" data-instalar-ajustes>Instalar en este dispositivo</button>'}<button class="btn" data-compartir>${ic('enviar')} Compartir con un colega</button></div>
     </section>
 
     <section class="tarjeta">
@@ -881,8 +894,27 @@ export function vistaAjustes() {
         toast(e.target.checked ? 'Alertas activadas' : 'Alertas desactivadas');
       });
 
+      $('[data-google]')?.addEventListener('click', async (e) => {
+        e.currentTarget.disabled = true;
+        try { const p = await conectarGoogle(); if (p) toast(`Conectado como ${p.email}`); }
+        catch (err) { toast(err.message, null, 6000); }
+        refrescar();
+      });
+      $('[data-sync-ahora]')?.addEventListener('click', async () => {
+        if (!G.tokenValido()) { try { await G.pedirToken(''); } catch (err) { toast(err.message); return; } }
+        await sincronizar(); toast(estadoSync().mensaje); refrescar();
+      });
+      $('[data-salir]')?.addEventListener('click', async () => {
+        if (!(await confirmar('¿Cerrar sesión de Google en este dispositivo? Tus datos siguen guardados en tu Google Drive.', 'Cerrar sesión'))) return;
+        const borrar = await confirmar('¿Borrar también los datos de ESTE dispositivo? (Recomendado si no es tu equipo personal.)', 'Sí, borrar', true);
+        G.cerrarSesion();
+        store.guardarConfig({ modo: '', googleEmail: '', googleNombre: '', sheetId: '', sheetUrl: '', lastSync: '' });
+        if (borrar) { await store.vaciarTodo(); localStorage.removeItem('control.iniciado'); location.hash = '#/bienvenida'; }
+        else refrescar();
+      });
+      // Conexión avanzada (Apps Script): solo existe si no se usa "Continuar con Google"
       const leerCon = () => ({ apiUrl: $('#aj-url').value.trim(), token: $('#aj-token').value.trim() });
-      $('[data-probar]').onclick = async () => {
+      if ($('#aj-url')) $('[data-probar]').onclick = async () => {
         const c = leerCon();
         if (!c.apiUrl || !c.token) { toast('Completa URL y token'); return; }
         try {
@@ -890,7 +922,7 @@ export function vistaAjustes() {
           toast(`✔ Conectado a “${r.hoja}”`);
         } catch (e) { toast(`✖ ${e.message}`, null, 6000); }
       };
-      $('[data-guardar-con]').onclick = async () => {
+      if ($('#aj-url')) $('[data-guardar-con]').onclick = async () => {
         const c = leerCon();
         if (!c.apiUrl || !c.token) { toast('Completa URL y token'); return; }
         const cambio = c.apiUrl !== cfg.apiUrl;
@@ -900,7 +932,7 @@ export function vistaAjustes() {
           vaciado = await confirmar('Este dispositivo tiene datos de EJEMPLO. ¿Borrarlos antes de conectar? (Recomendado: así no se suben a tu Google Sheet)', 'Borrar ejemplo');
           if (vaciado) await store.vaciarTodo();
         }
-        store.guardarConfig({ ...c, ...(cambio ? { lastSync: '' } : {}) });
+        store.guardarConfig({ ...c, modo: '', ...(cambio ? { lastSync: '' } : {}) });
         // Al conectar por primera vez, subir todo lo local
         if (cambio && !vaciado) {
           for (const t of store.TABLAS) for (const r of store.todos(t)) await sinRefrescar(() => store.guardar(t, { id: r.id }));
@@ -986,6 +1018,7 @@ export function vistaMas() {
       ${it('#/diario', 'lista', 'Diario', 'Tus cierres del día')}
       ${it('#/revision', 'revision', 'Revisión semanal', 'Que no se pase nada')}
       ${it('#/ajustes', 'ajustes', 'Ajustes', 'Google Sheets, alertas, respaldo')}
+      <a class="mas-item" href="#" data-compartir>${ic('enviar')}<div><b>Compartir la app</b><span>Envía el enlace a un colega</span></div>${ic('flecha')}</a>
     </div>`,
   };
 }

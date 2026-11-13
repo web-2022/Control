@@ -60,6 +60,7 @@ function idbVaciar(tabla) {
 const CONFIG_DEFECTO = {
   apiUrl: '', token: '', miNombre: '', lastSync: '', tema: 'auto',
   notificaciones: false, avisoMin: 15, disciplinas: null, demo: false,
+  modo: '', googleEmail: '', googleNombre: '', sheetId: '', sheetUrl: '',
 };
 export function config() {
   try { return { ...CONFIG_DEFECTO, ...JSON.parse(localStorage.getItem(CLAVE_CONFIG) || '{}') }; }
@@ -91,6 +92,8 @@ export function confirmarSubidos(lista) {
   emitir('outbox');
 }
 export const pendientesDeSubir = () => Object.keys(outbox()).length;
+/** Pone un registro en la cola de subida sin modificarlo. */
+export const marcarParaSubir = (tabla, r) => encolar(tabla, r);
 
 // ---------------- Eventos ----------------
 export function suscribir(fn) { oyentes.add(fn); return () => oyentes.delete(fn); }
@@ -154,7 +157,7 @@ export async function aplicarRemotos(tabla, lista) {
     const loc = datos[tabla].get(rem.id);
     // Si hay un cambio local sin subir y es más nuevo, se conserva el local.
     if (loc && o[`${tabla}:${rem.id}`] && (loc.updatedAt || '') >= (rem.updatedAt || '')) continue;
-    if (loc && (loc.updatedAt || '') > (rem.updatedAt || '')) continue;
+    if (loc && (loc.updatedAt || '') >= (rem.updatedAt || '')) continue; // igual o más nuevo: nada que hacer
     delete rem._srv;
     datos[tabla].set(rem.id, rem);
     aGuardar.push(rem);

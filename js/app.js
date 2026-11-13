@@ -8,8 +8,10 @@ import * as V from './vistas.js';
 import * as MD from './modales.js';
 import { vistaDiario } from './diario.js';
 import { iniciarInstalacion, actualizarBotones } from './instalar.js';
-import { iniciarAuto, alCambiarEstado, sincronizar } from './sync.js';
-import { cargarDemo } from './demo.js';
+import { vistaBienvenida } from './bienvenida.js';
+import { iniciarCompartir } from './compartir.js';
+import * as G from './google.js';
+import { iniciarAuto, alCambiarEstado, sincronizar, estadoSync, reconectarGoogle, conectado } from './sync.js';
 import { cerrarModalSuperior, hayModal, enSilencio, toast } from './ui.js';
 import { ic } from './iconos.js';
 import { hoy, debounce } from './util.js';
@@ -33,6 +35,7 @@ const RUTAS = {
   diario: () => vistaDiario(),
   ajustes: () => V.vistaAjustes(),
   mas: () => V.vistaMas(),
+  bienvenida: () => vistaBienvenida(),
 };
 
 function rutaActual() {
@@ -55,6 +58,7 @@ function render(cambioDeRuta = false) {
 
   limpiarVista?.();
   const v = RUTAS[nombre](param);
+  document.body.classList.toggle('modo-limpio', v.layout === 'limpio');
   cont.innerHTML = v.html;
   document.title = `${v.titulo} · Control`;
   v.montar?.(cont, () => render(false));
@@ -128,7 +132,7 @@ function pintarSync(es) {
   el.className = `sync sync-${es.estado}`;
   el.title = es.mensaje || '';
   el.querySelector('span').textContent = {
-    local: 'Local', ok: 'Sincronizado', pendiente: `${es.pendientes} por subir`, sync: 'Sincronizando…', error: 'Error de sync', offline: 'Sin conexión',
+    local: 'Local', ok: 'Sincronizado', reauth: 'Reconectar', pendiente: `${es.pendientes} por subir`, sync: 'Sincronizando…', error: 'Error de sync', offline: 'Sin conexión',
   }[es.estado] || es.estado;
 }
 
@@ -172,18 +176,32 @@ async function iniciar() {
   document.documentElement.dataset.tema = cfg.tema || 'auto';
   await store.iniciar();
 
-  // Primera vez sin datos ni conexión: cargar ejemplo para explorar
+  // Primera vez (sin datos ni conexión): página de bienvenida
   const vacio = store.TABLAS.every((t) => store.todos(t).length === 0);
-  if (vacio && !cfg.apiUrl && !localStorage.getItem('control.iniciado')) {
-    await cargarDemo();
+  if (vacio && !conectado(cfg) && !localStorage.getItem('control.iniciado')) {
+    location.hash = '#/bienvenida';
+  } else if (!localStorage.getItem('control.iniciado')) {
+    localStorage.setItem('control.iniciado', '1');
   }
-  localStorage.setItem('control.iniciado', '1');
+  // Precargar Google para que "reconectar" abra su ventana al primer toque
+  if (cfg.modo === 'google' && G.configurado()) G.cargarGIS().catch(() => {});
 
   // Interfaz fija
   $('#fab-mas').addEventListener('click', () => MD.abrirCaptura());
   $('#fab-voz').addEventListener('click', () => MD.abrirCaptura({ voz: true }));
   if (!vozDisponible()) $('#fab-voz').classList.add('sin-voz');
-  $('#sync').addEventListener('click', () => { if (store.config().apiUrl) sincronizar(); else location.hash = '#/ajustes'; });
+  $('#sync').addEventListener('click', async () => {
+    if (estadoSync().estado === 'reauth') {
+      try { await reconectarGoogle(); toast('Reconectado con Google'); } catch (e) { toast(e.message); }
+    } else if (conectado()) sincronizar();
+    else location.hash = '#/ajustes';
+  });
+  // Si la sesión de Google venció (dura ~1 h), reconectar al primer toque del usuario
+  document.addEventListener('pointerdown', () => {
+    if (store.config().modo === 'google' && estadoSync().estado === 'reauth' && G.configurado() && window.google?.accounts) {
+      reconectarGoogle().catch(() => {});
+    }
+  }, { capture: true });
   const buscar = $('#buscar-global');
   buscar.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -197,6 +215,7 @@ async function iniciar() {
 
   enlazarAcciones();
   iniciarInstalacion();
+  iniciarCompartir();
   window.addEventListener('hashchange', () => render(true));
   store.suscribir((tipo) => {
     if (tipo === 'cambio' && !enSilencio()) renderDiferido();

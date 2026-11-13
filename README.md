@@ -51,7 +51,19 @@ La primera vez la app se abre con **datos de ejemplo** para que la explores. Bó
 
 ---
 
-## Instalación paso a paso
+## Empezar (usuarios nuevos)
+
+1. Abre **https://web-2022.github.io/Control/**.
+2. Pulsa **Continuar con Google** y acepta los permisos.
+3. Listo: la app crea sola la hoja **“Control – Mis datos”** en tu Google Drive y guarda ahí todo. Entra con la misma cuenta en el celular y en la PC para ver lo mismo.
+
+La app usa solo el permiso `drive.file`: puede ver **únicamente** la hoja que ella crea, nada más de tu Drive. Ver la [política de privacidad](privacidad.html).
+
+Para compartir la app con un colega usa el botón **Compartir** (arriba en la app).
+
+## Conexión avanzada con Apps Script (opcional)
+
+La forma recomendada es **Continuar con Google**. Lo siguiente solo es necesario si prefieres usar tu propio Apps Script.
 
 ### 1. Publicar la app (GitHub Pages)
 

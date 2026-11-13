@@ -10,8 +10,9 @@
 // Si no hay internet, los cambios esperan en la cola sin perderse.
 // ============================================================
 import * as store from './store.js';
+import * as G from './google.js';
 
-let estado = 'local';     // local | ok | pendiente | sync | error | offline
+let estado = 'local';     // local | ok | pendiente | sync | error | offline | reauth
 let mensaje = '';
 let enCurso = null;
 const oyentes = new Set();
@@ -44,10 +45,27 @@ export function sincronizar() {
   return enCurso;
 }
 
+/** ¿Hay alguna conexión configurada (Google o Apps Script)? */
+export const conectado = (cfg = store.config()) => cfg.modo === 'google' || !!(cfg.apiUrl && cfg.token);
+
 async function _sincronizar() {
   const cfg = store.config();
-  if (!cfg.apiUrl || !cfg.token) { poner('local', 'Solo en este dispositivo'); return; }
+  if (!conectado(cfg)) { poner('local', 'Solo en este dispositivo'); return; }
   if (!navigator.onLine) { poner('offline', 'Sin conexión'); return; }
+  if (cfg.modo === 'google') {
+    if (!G.tokenValido()) { poner('reauth', 'Toca para reconectar con Google'); return; }
+    poner('sync', 'Sincronizando…');
+    try {
+      await G.sincronizarGoogle();
+      const p = store.pendientesDeSubir();
+      poner(p ? 'pendiente' : 'ok', p ? `${p} por subir` : 'Sincronizado con Google');
+    } catch (e) {
+      console.warn('Sync Google', e);
+      if (e instanceof G.NecesitaLogin) poner('reauth', 'Toca para reconectar con Google');
+      else poner(navigator.onLine ? 'error' : 'offline', navigator.onLine ? `Error: ${e.message}` : 'Sin conexión');
+    }
+    return;
+  }
   poner('sync', 'Sincronizando…');
   try {
     // 1. SUBIR
@@ -88,9 +106,19 @@ let temporizador = null;
 /** Programa una sincronización en 2 s (agrupa varios cambios seguidos). */
 export function programar() {
   clearTimeout(temporizador);
-  const cfg = store.config();
-  if (cfg.apiUrl && cfg.token) poner('pendiente', `${store.pendientesDeSubir()} por subir`);
+  if (conectado()) poner(estado === 'reauth' ? 'reauth' : 'pendiente', estado === 'reauth' ? mensaje : `${store.pendientesDeSubir()} por subir`);
   temporizador = setTimeout(sincronizar, 2000);
+}
+
+/** Reconecta con Google (llamar desde un clic) y sincroniza. */
+export async function reconectarGoogle() {
+  await G.pedirToken('');
+  return sincronizar();
+}
+
+/** Marca todo lo local para subirlo (al conectar una hoja nueva). */
+export async function encolarTodo() {
+  for (const t of store.TABLAS) for (const r of store.todos(t)) store.marcarParaSubir(t, r);
 }
 
 /** Activa la sincronización automática. */

@@ -108,8 +108,8 @@ code { font: 12.5px var(--mono); background: var(--sup2); padding: 1px 5px; bord
 .buscar { display: flex; align-items: center; gap: 8px; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio-s); padding: 0 10px; color: var(--tenue); }
 .buscar input { border: 0; background: transparent; color: var(--txt); padding: 8px 0; width: 100%; font: inherit; outline: none; }
 .buscar:focus-within { border-color: var(--acento); }
-.buscar-global { flex: 1; max-width: 460px; }
-.sync { margin-left: auto; display: flex; align-items: center; gap: 7px; background: transparent; border: 1px solid var(--borde); color: var(--txt2); border-radius: 999px; padding: 5px 12px; font: 12.5px var(--fuente); cursor: pointer; white-space: nowrap; }
+.buscar-global { flex: 1; max-width: 460px; margin-right: auto; }
+.sync { display: flex; align-items: center; gap: 7px; background: transparent; border: 1px solid var(--borde); color: var(--txt2); border-radius: 999px; padding: 5px 12px; font: 12.5px var(--fuente); cursor: pointer; white-space: nowrap; }
 .sync i { width: 8px; height: 8px; border-radius: 50%; background: var(--tenue); }
 .sync-ok i { background: var(--verde); }
 .sync-pendiente i { background: var(--acento); }
@@ -555,10 +555,48 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 @media (max-width: 860px) { .cierre-kpis b { font-size: 20px; } .vista-acc .btn span { display: inline; } }
 
 /* ---------------- Instalar app ---------------- */
-.btn-instalar { margin-left: auto; border-color: var(--acento); color: var(--acento); }
-.btn-instalar + .sync { margin-left: 0; }
+.btn-instalar { border-color: var(--acento); color: var(--acento); }
 .aviso-instalar { background: var(--acento-suave); }
 .mas-instalar { background: var(--acento-suave); }
 .pasos-instalar { padding-left: 22px; margin: 4px 0 10px; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
 .tecla { display: inline-block; padding: 0 7px; border: 1px solid var(--borde2); border-radius: 6px; background: var(--sup2); font-weight: 700; }
 @media (max-width: 860px) { .btn-instalar span { display: none; } .btn-instalar { padding: 0 9px; } }
+
+/* ---------------- Página de bienvenida ---------------- */
+body.modo-limpio .lateral, body.modo-limpio .cabecera, body.modo-limpio .nav-inferior, body.modo-limpio .fabs { display: none; }
+body.modo-limpio .vista { margin: 0 auto; padding: 0 20px 60px; max-width: 1040px; }
+.bienvenida { display: flex; flex-direction: column; gap: 34px; padding-top: max(22px, env(safe-area-inset-top)); }
+.bv-cab { display: flex; align-items: center; gap: 12px; font-weight: 750; font-size: 22px; letter-spacing: -.02em; }
+.bv-cab img { border-radius: 11px; }
+.bv-hero { text-align: center; padding: 26px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.bv-hero h1 { font-size: clamp(30px, 5.4vw, 52px); line-height: 1.08; letter-spacing: -.03em; max-width: 820px; font-weight: 780; }
+.bv-hero h1 em { font-style: normal; color: var(--acento); }
+.bv-hero > p { font-size: clamp(16px, 2vw, 19px); color: var(--txt2); max-width: 640px; margin: 0; }
+.bv-google { display: inline-flex; align-items: center; gap: 12px; margin-top: 10px; padding: 0 26px; min-height: 56px; border-radius: 14px; border: 0; background: var(--acento); color: var(--acento-txt); font: 700 17px var(--fuente); cursor: pointer; box-shadow: var(--sombra); transition: transform .12s; }
+.bv-google:hover:not(:disabled) { transform: translateY(-2px); }
+.bv-google:disabled { opacity: .55; cursor: not-allowed; }
+.bv-google .ic { width: 22px; height: 22px; }
+.bv-estado { font-size: 13.5px; color: var(--tenue); margin: 0; min-height: 18px; }
+.bv-sec { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.btn-txt { border-color: transparent; background: transparent; color: var(--txt2); }
+.bv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.bv-tarjeta { background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.bv-tarjeta .ic { width: 24px; height: 24px; color: var(--acento); margin-bottom: 4px; }
+.bv-tarjeta span { color: var(--txt2); font-size: 14px; }
+.bv-privacidad { display: flex; gap: 14px; align-items: flex-start; background: var(--verde-suave); border: 1px solid color-mix(in srgb, var(--verde) 30%, transparent); border-radius: var(--radio); padding: 16px 18px; font-size: 14.5px; }
+.bv-privacidad .ic { color: var(--verde); width: 22px; height: 22px; margin-top: 2px; }
+.bv-pie { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+@media (max-width: 760px) { .bv-grid { grid-template-columns: 1fr 1fr; } .bv-hero { padding-top: 10px; } }
+@media (max-width: 460px) { .bv-grid { grid-template-columns: 1fr; } .bv-google { width: 100%; justify-content: center; } }
+
+/* ---------------- Compartir / sync ---------------- */
+.btn-compartir { color: var(--txt2); }
+.sync-reauth { color: var(--acento); border-color: var(--acento); }
+.sync-reauth i { background: var(--acento); animation: pulso 1.2s infinite; }
+.enlace-compartir { display: flex; gap: 8px; margin: 10px 0; }
+.enlace-compartir input { flex: 1; padding: 9px 10px; min-width: 0; }
+.avanzado { margin-top: 4px; }
+.avanzado summary { cursor: pointer; color: var(--txt2); font-size: 13.5px; margin-bottom: 8px; }
+.avanzado .campo { margin-bottom: 10px; }
+.bv-legal { text-align: center; font-size: 13px; margin: -18px 0 0; }
+.bv-legal a { color: var(--tenue); }
