@@ -93,7 +93,10 @@ export async function pedirToken(prompt = '') {
       guardarToken(r.access_token, r.expires_in);
       ok(token);
     };
-    cliente.error_callback = (e) => mal(new Error(e?.type === 'popup_closed' ? 'Cerraste la ventana de Google' : (e?.message || 'No se pudo iniciar sesión')));
+    cliente.error_callback = (e) => mal(new Error(
+      e?.type === 'popup_closed' ? 'Cerraste la ventana de Google. Pulsa de nuevo para intentarlo.'
+        : e?.type === 'popup_failed_to_open' ? 'El navegador bloqueó la ventana de Google. Permite las ventanas emergentes para este sitio (ícono en la barra de direcciones) y vuelve a intentarlo.'
+          : (e?.message || 'No se pudo iniciar sesión')));
     const op = { prompt };
     const email = store.config().googleEmail;
     if (email) op.hint = email;

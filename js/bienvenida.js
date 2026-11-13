@@ -89,13 +89,21 @@ export function vistaBienvenida() {
       el.querySelector('[data-google]').onclick = async (e) => {
         const b = e.currentTarget;
         b.disabled = true;
-        est.textContent = 'Abriendo Google…';
+        est.classList.remove('rojo');
+        est.textContent = 'Abriendo la ventana de Google… complétala para continuar.';
+        // Si la ventana no aparece (bloqueada o detrás), permitir reintentar
+        const aviso = setTimeout(() => {
+          b.disabled = false;
+          est.innerHTML = '¿No ves la ventana de Google? Puede estar <b>detrás de esta ventana</b> o <b>bloqueada</b> (ícono a la derecha de la barra de direcciones → “Permitir siempre ventanas emergentes”). Luego pulsa de nuevo <b>Continuar con Google</b>.';
+        }, 12000);
         try {
           const p = await conectarGoogle();
+          clearTimeout(aviso);
           if (!p) { b.disabled = false; est.textContent = ''; return; }
           toast(`¡Hola ${(p.nombre || p.email).split(' ')[0]}! Tu hoja “Control – Mis datos” está lista en tu Google Drive.`, null, 6000);
           location.hash = '#/hoy';
         } catch (err) {
+          clearTimeout(aviso);
           b.disabled = false;
           est.textContent = err.message;
           est.classList.add('rojo');
