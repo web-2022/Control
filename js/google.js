@@ -162,7 +162,7 @@ async function crearHoja() {
   const nueva = await api(SHEETS, {
     method: 'POST',
     body: JSON.stringify({
-      properties: { title: NOMBRE_HOJA, locale: 'es_419', timeZone: 'America/Lima' }, // es_419 = español (Latinoamérica); es_PE no es válido en Sheets
+      properties: { title: NOMBRE_HOJA, timeZone: 'America/Lima' }, // sin locale: usa el de la cuenta (es_PE no es válido en Sheets)
       sheets: tablas.map((t) => ({
         properties: { title: HOJAS[t], gridProperties: { rowCount: 500, columnCount: COLUMNAS[t].length + 5, frozenRowCount: 1 } },
       })),
