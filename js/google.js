@@ -240,42 +240,91 @@ function deFila(fila, enc) {
 }
 
 // ---------------- Sincronización ----------------
-/** Baja la hoja, mezcla con lo local (gana lo más reciente) y sube lo pendiente. */
+/** Letra de columna (0 -> A, 25 -> Z, 26 -> AA). */
+const letra = (i) => { let s = ''; i += 1; while (i > 0) { const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; };
+const lote = (url, rangos) => api(`${url}?${rangos.map((r) => `ranges=${enc(r)}`).join('&')}&valueRenderOption=UNFORMATTED_VALUE&majorDimension=ROWS`);
+
+/**
+ * Sincroniza con la hoja del usuario. Para ahorrar datos móviles:
+ *  A) lee solo los encabezados,
+ *  B) lee solo las columnas id y updatedAt,
+ *  C) descarga únicamente las filas que cambiaron en otro dispositivo.
+ * Luego sube la bandeja de salida (gana el cambio más reciente).
+ */
 export async function sincronizarGoogle() {
   const id = await asegurarHoja();
   const tablas = Object.keys(HOJAS);
-  const lectura = await api(`${SHEETS}/${id}/values:batchGet?${tablas.map((t) => `ranges=${enc(HOJAS[t])}`).join('&')}&valueRenderOption=UNFORMATTED_VALUE&majorDimension=ROWS`);
+  const URLGET = `${SHEETS}/${id}/values:batchGet`;
 
+  // A) Encabezados
+  const cab = await lote(URLGET, tablas.map((t) => `${HOJAS[t]}!1:1`));
   const remoto = {};
   const actualizarEnc = [];
   tablas.forEach((t, i) => {
-    const filas = lectura.valueRanges?.[i]?.values || [];
-    let encab = (filas[0] || []).map(String);
+    let encab = (cab.valueRanges?.[i]?.values?.[0] || []).map(String);
     const faltan = COLUMNAS[t].filter((c) => !encab.includes(c));
     if (!encab.length || faltan.length) {
       encab = [...encab, ...faltan];
       actualizarEnc.push({ range: `${HOJAS[t]}!A1`, values: [encab] });
     }
-    const fila = {}, upd = {}, regs = [];
-    filas.slice(1).forEach((f, j) => {
-      const r = deFila(f, encab);
-      if (!r.id) return;
-      r.id = String(r.id);
-      fila[r.id] = j + 2; // número de fila en la hoja
-      upd[r.id] = String(r.updatedAt || '');
-      regs.push(r);
-    });
-    remoto[t] = { encab, fila, upd, regs, ultima: filas.length };
+    remoto[t] = { encab, fila: {}, upd: {}, regs: [] };
   });
   if (actualizarEnc.length) {
     await api(`${SHEETS}/${id}/values:batchUpdate`, { method: 'POST', body: JSON.stringify({ valueInputOption: 'RAW', data: actualizarEnc }) });
+  }
+
+  // B) Solo id y updatedAt
+  const rangosB = [];
+  for (const t of tablas) {
+    const e = remoto[t].encab;
+    const ci = letra(e.indexOf('id')), cu = letra(e.indexOf('updatedAt'));
+    rangosB.push(`${HOJAS[t]}!${ci}2:${ci}`, `${HOJAS[t]}!${cu}2:${cu}`);
+  }
+  const col = await lote(URLGET, rangosB);
+  const cola = store.outbox();
+  const pedir = []; // filas a descargar: { t, n }
+  tablas.forEach((t, i) => {
+    const ids = col.valueRanges?.[i * 2]?.values || [];
+    const upds = col.valueRanges?.[i * 2 + 1]?.values || [];
+    const R = remoto[t];
+    ids.forEach((f, j) => {
+      const rid = f?.[0];
+      if (rid === undefined || rid === '') return;
+      const k = String(rid);
+      R.fila[k] = j + 2;
+      R.upd[k] = String(upds[j]?.[0] || '');
+      const loc = store.crudo(t, k);
+      const masNuevoAlla = !loc || (loc.updatedAt || '') < R.upd[k];
+      if (masNuevoAlla && !(cola[`${t}:${k}`] && loc && (loc.updatedAt || '') >= R.upd[k])) pedir.push({ t, n: j + 2 });
+    });
+  });
+
+  // C) Descargar solo lo que cambió (si es mucho, la hoja completa de esa tabla)
+  const porTabla = {};
+  for (const x of pedir) (porTabla[x.t] ||= []).push(x.n);
+  const completas = Object.keys(porTabla).filter((t) => porTabla[t].length > 150);
+  if (completas.length) {
+    const r = await lote(URLGET, completas.map((t) => HOJAS[t]));
+    completas.forEach((t, i) => {
+      for (const f of (r.valueRanges?.[i]?.values || []).slice(1)) { const reg = deFila(f, remoto[t].encab); if (reg.id) { reg.id = String(reg.id); remoto[t].regs.push(reg); } }
+    });
+  }
+  const sueltas = Object.entries(porTabla).filter(([t]) => !completas.includes(t)).flatMap(([t, ns]) => ns.map((n) => ({ t, n })));
+  for (let i = 0; i < sueltas.length; i += 80) {
+    const parte = sueltas.slice(i, i + 80);
+    const r = await lote(URLGET, parte.map(({ t, n }) => `${HOJAS[t]}!A${n}:${letra(remoto[t].encab.length - 1)}${n}`));
+    parte.forEach(({ t }, k) => {
+      const f = r.valueRanges?.[k]?.values?.[0];
+      if (!f) return;
+      const reg = deFila(f, remoto[t].encab);
+      if (reg.id) { reg.id = String(reg.id); remoto[t].regs.push(reg); }
+    });
   }
 
   // 1. Aplicar lo remoto (otros dispositivos)
   for (const t of tablas) await store.aplicarRemotos(t, remoto[t].regs);
 
   // 2. Subir la bandeja de salida
-  const cola = store.outbox();
   const cambios = [];
   const nuevos = {};
   const enviados = [];

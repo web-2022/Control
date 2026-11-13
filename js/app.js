@@ -6,6 +6,7 @@ import * as store from './store.js';
 import * as M from './modelo.js';
 import * as V from './vistas.js';
 import * as MD from './modales.js';
+import { expandidos } from './componentes.js';
 import { vistaDiario } from './diario.js';
 import { iniciarInstalacion, actualizarBotones } from './instalar.js';
 import { vistaBienvenida } from './bienvenida.js';
@@ -101,6 +102,8 @@ function enlazarAcciones() {
       else if (acc === 'comentar') { e.preventDefault(); MD.comentar(id); }
       return;
     }
+    const x = e.target.closest('[data-expandir]');
+    if (x) { e.preventDefault(); expandidos.set(x.dataset.expandir, Number(x.dataset.lim)); render(false); return; }
     const h = e.target.closest('[data-href]');
     if (h) location.hash = h.dataset.href;
   });
@@ -164,8 +167,11 @@ async function iniciar() {
     else location.hash = '#/ajustes';
   });
   // Si la sesión de Google venció (dura ~1 h), reconectar al primer toque del usuario
+  let ultimoIntento = 0;
   document.addEventListener('pointerdown', () => {
-    if (store.config().modo === 'google' && estadoSync().estado === 'reauth' && G.configurado() && window.google?.accounts) {
+    if (store.config().modo === 'google' && estadoSync().estado === 'reauth' && G.configurado() && window.google?.accounts
+      && Date.now() - ultimoIntento > 120000) {
+      ultimoIntento = Date.now();
       reconectarGoogle().catch(() => {});
     }
   }, { capture: true });

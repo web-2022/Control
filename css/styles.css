@@ -604,3 +604,6 @@ body.modo-limpio .vista { margin: 0 auto; padding: 0 20px 60px; max-width: 1040p
 .aviso-avisos .ic { color: var(--azul); }
 .cal-botones { margin: 2px 0 12px; }
 .cal-botones .btn { font-size: 12.5px; }
+.mas-items { width: 100%; padding: 11px; border: 0; border-top: 1px solid var(--borde); background: var(--sup2); color: var(--azul); font: 600 13.5px var(--fuente); cursor: pointer; }
+.mas-items span { color: var(--tenue); font-weight: 500; }
+.kcol .mas-items { border: 1px dashed var(--borde2); border-radius: var(--radio-s); }

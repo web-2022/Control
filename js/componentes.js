@@ -37,9 +37,21 @@ export function filaPendiente(p, op = {}) {
 }
 
 /** Lista de pendientes con mensaje si está vacía. */
+/** Secciones que el usuario expandió con "Mostrar más" (se mantiene mientras navega). */
+export const expandidos = new Map();
+
+/**
+ * Lista de pendientes. Para no hacer lenta la app con miles de registros,
+ * muestra los primeros 40 y un botón "Mostrar más".
+ */
 export function listaPendientes(lista, vacio = 'Nada por aquí', op = {}) {
   if (!lista.length) return `<div class="vacio">${esc(vacio)}</div>`;
-  return `<div class="lista">${lista.map((p) => filaPendiente(p, op)).join('')}</div>`;
+  const clave = op.clave || `${lista.length}:${lista[0].id}`;
+  const lim = expandidos.get(clave) || op.limite || 40;
+  const visibles = lista.slice(0, lim);
+  const resto = lista.length - visibles.length;
+  return `<div class="lista">${visibles.map((p) => filaPendiente(p, op)).join('')}${resto > 0
+    ? `<button class="mas-items" data-expandir="${esc(clave)}" data-lim="${lim + 100}">Mostrar ${Math.min(100, resto)} más <span>(${resto} restantes)</span></button>` : ''}</div>`;
 }
 
 /** Sección con título y contador. */

@@ -100,9 +100,9 @@ export function vistaHoy() {
   ${nInbox ? `<a class="aviso aviso-azul" href="#/inbox">${ic('inbox')}<span>Tienes <b>${nInbox}</b> ${nInbox === 1 ? 'captura' : 'capturas'} sin clasificar en el Inbox</span>${ic('flecha')}</a>` : ''}
   <div class="rejilla-2">
     <div>
-      ${venc.length ? C.seccion('Vencidos', C.listaPendientes(venc), { n: venc.length, colorN: 'n-rojo', icono: 'reloj', clase: 'sec-roja' }) : ''}
+      ${venc.length ? C.seccion('Vencidos', C.listaPendientes(venc, '', { clave: 'hoy-venc', limite: 15 }), { n: venc.length, colorN: 'n-rojo', icono: 'reloj', clase: 'sec-roja', extra: venc.length > 15 ? `<a class="mini-link" href="#/pendientes?rango=vencidos&vista=lista">Ver todos</a>` : '' }) : ''}
       ${C.seccion('Para hoy', C.listaPendientes(dh, 'Nada programado para hoy. ¡Buen momento para avanzar lo importante!'), { n: dh.length, icono: 'hoy' })}
-      ${C.seccion('Próximos 7 días', C.listaPendientes(prox, 'Sin compromisos en los próximos 7 días'), { n: prox.length, icono: 'calendario' })}
+      ${C.seccion('Próximos 7 días', C.listaPendientes(prox, 'Sin compromisos en los próximos 7 días', { clave: 'hoy-prox', limite: 20 }), { n: prox.length, icono: 'calendario' })}
     </div>
     <div>
       ${C.seccion('Reuniones de hoy', reus.length ? `<div class="lista">${reus.map(tarjetaReunion).join('')}</div>` : '<div class="vacio">Sin reuniones hoy</div>', { n: reus.length, icono: 'calendario', extra: `<a class="mini-link" href="#/reuniones">Ver agenda</a>` })}
@@ -290,27 +290,29 @@ export function vistaPendientes() {
   let contenido = '';
   if (filtro.vista === 'lista') {
     const g = agrupar(lista, (p) => bucketFecha(p, H));
-    contenido = Object.keys(g).sort().map((k) => C.seccion(k.slice(2), C.listaPendientes(g[k]), { n: g[k].length, clase: k.startsWith('0') ? 'sec-roja' : '', colorN: k.startsWith('0') ? 'n-rojo' : '' })).join('')
+    contenido = Object.keys(g).sort().map((k) => C.seccion(k.slice(2), C.listaPendientes(g[k], '', { clave: 'lista-' + k }), { n: g[k].length, clase: k.startsWith('0') ? 'sec-roja' : '', colorN: k.startsWith('0') ? 'n-rojo' : '' })).join('')
       || '<div class="vacio vacio-grande">' + ic('check') + '<b>Sin resultados</b><span>No hay pendientes con estos filtros.</span></div>';
   } else if (filtro.vista === 'kanban') {
     const cols = [...ESTADOS_ABIERTOS, 'Hecho'];
     const hace7 = addDias(H, -7);
+    const pasanSinEstado = idsSinEstado();
     contenido = `<div class="kanban">${cols.map((e) => {
-      const items = (e === 'Hecho' ? M.pendientes().filter((p) => p.estado === 'Hecho' && fechaLocal(p.cerrado) >= hace7 && pasaFiltrosSinEstado(p)) : lista.filter((p) => (p.estado || 'Pendiente') === e));
+      const items = (e === 'Hecho' ? M.pendientes().filter((p) => p.estado === 'Hecho' && fechaLocal(p.cerrado) >= hace7 && pasanSinEstado.has(p.id)) : lista.filter((p) => (p.estado || 'Pendiente') === e));
       return `<div class="kcol" data-estado="${esc(e)}">
         <h3 class="kcol-tit est-${esc(e.split(' ')[0].toLowerCase())}">${esc(e)}<span class="contador">${items.length}</span></h3>
-        <div class="kcol-cuerpo">${items.map((p) => C.filaPendiente(p, { arrastrable: true, compacto: true, sinPosponer: true })).join('') || '<div class="vacio vacio-mini">Arrastra aquí</div>'}</div>
+        <div class="kcol-cuerpo">${items.slice(0, C.expandidos.get('k-' + e) || 40).map((p) => C.filaPendiente(p, { arrastrable: true, compacto: true, sinPosponer: true })).join('') || '<div class="vacio vacio-mini">Arrastra aquí</div>'}
+          ${items.length > (C.expandidos.get('k-' + e) || 40) ? `<button class="mas-items" data-expandir="k-${esc(e)}" data-lim="${(C.expandidos.get('k-' + e) || 40) + 100}">Mostrar más (${items.length - (C.expandidos.get('k-' + e) || 40)})</button>` : ''}</div>
       </div>`;
     }).join('')}</div>${e7nota()}`;
   } else if (filtro.vista === 'responsable') {
     const g = agrupar(lista, (p) => p.responsable || '');
     const claves = Object.keys(g).sort((a, b) => M.nombrePersona(a).localeCompare(M.nombrePersona(b)));
-    contenido = claves.map((k) => C.seccion(M.nombrePersona(k), C.listaPendientes(g[k], '', { sinPersona: true }), { n: g[k].length, icono: 'usuario', extra: `<a class="mini-link" href="#/persona/${esc(k || 'yo')}">Ver 1:1</a>` })).join('') || '<div class="vacio">Sin resultados</div>';
+    contenido = claves.map((k) => C.seccion(M.nombrePersona(k), C.listaPendientes(g[k], '', { sinPersona: true, clave: 'resp-' + k }), { n: g[k].length, icono: 'usuario', extra: `<a class="mini-link" href="#/persona/${esc(k || 'yo')}">Ver 1:1</a>` })).join('') || '<div class="vacio">Sin resultados</div>';
   } else if (filtro.vista === 'proyecto') {
     const g = agrupar(lista, (p) => p.proyectoId || '');
     contenido = Object.keys(g).sort((a, b) => (M.proyecto(a)?.nombre || 'zzz').localeCompare(M.proyecto(b)?.nombre || 'zzz')).map((k) => {
       const pr = M.proyecto(k);
-      return C.seccion(pr ? pr.nombre : 'Sin proyecto', C.listaPendientes(g[k], '', { sinProyecto: true }), { n: g[k].length, icono: 'proyecto', extra: pr ? `<a class="mini-link" href="#/proyecto/${esc(k)}">Abrir</a>` : '' });
+      return C.seccion(pr ? pr.nombre : 'Sin proyecto', C.listaPendientes(g[k], '', { sinProyecto: true, clave: 'proy-' + k }), { n: g[k].length, icono: 'proyecto', extra: pr ? `<a class="mini-link" href="#/proyecto/${esc(k)}">Abrir</a>` : '' });
     }).join('') || '<div class="vacio">Sin resultados</div>';
   } else if (filtro.vista === 'esperando') {
     const esp = lista.filter(M.esEsperando);
@@ -323,7 +325,7 @@ export function vistaPendientes() {
           ${pe.telefono ? `<a class="mini-link" target="_blank" rel="noopener" href="${linkWhatsApp(pe.telefono, texto)}">WhatsApp</a>` : ''}
           <a class="mini-link" href="${linkCorreo(pe.email, 'Seguimiento de pendientes', texto)}">Correo</a>
           <button class="mini-link" data-copiar="${esc(texto)}">Copiar</button></span>` : '';
-      return C.seccion(M.nombrePersona(k), C.listaPendientes(items, '', { sinPersona: true }), { n: items.length, icono: 'usuario', extra });
+      return C.seccion(M.nombrePersona(k), C.listaPendientes(items, '', { sinPersona: true, clave: 'esp-' + k }), { n: items.length, icono: 'usuario', extra });
     }).join('') || '<div class="vacio vacio-grande">' + ic('espera') + '<b>No esperas nada de nadie</b><span>Todo lo delegado está cerrado.</span></div>');
   }
 
@@ -365,11 +367,12 @@ export function vistaPendientes() {
   };
 }
 const e7nota = () => '<p class="nota solo-movil">En el celular, toca una tarjeta para cambiar su estado.</p>';
-function pasaFiltrosSinEstado(p) {
+/** Ids que pasan todos los filtros menos el de estado (para la columna Hecho del Kanban). */
+function idsSinEstado() {
   const guard = filtro.estado; filtro.estado = 'todos';
-  const ok = filtrar().some((x) => x.id === p.id);
+  const ids = new Set(filtrar().map((x) => x.id));
   filtro.estado = guard;
-  return ok;
+  return ids;
 }
 
 // ============================================================
@@ -960,7 +963,13 @@ export function vistaAjustes() {
         refrescar();
       };
 
-      $('[data-demo]').onclick = async () => { await cargarDemo(); toast('Datos de ejemplo cargados'); location.hash = '#/hoy'; };
+      $('[data-demo]').onclick = async () => {
+        if (store.config().modo === 'google' || store.config().apiUrl) {
+          toast('Estás conectado a tu hoja de Google: cargar ejemplos los mezclaría con tus datos reales. Para verlos, usa una ventana de incógnito.', null, 8000);
+          return;
+        }
+        await cargarDemo(); toast('Datos de ejemplo cargados'); location.hash = '#/hoy';
+      };
       $('[data-vaciar]').onclick = async () => {
         if (await confirmar('Se borrarán todos los datos de ESTE dispositivo (tu Google Sheet no se toca). ¿Continuar?', 'Borrar todo', true)) {
           await store.vaciarTodo(); toast('Datos borrados'); refrescar();

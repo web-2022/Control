@@ -127,6 +127,6 @@ export function iniciarAuto() {
   window.addEventListener('online', sincronizar);
   window.addEventListener('offline', () => poner('offline', 'Sin conexión'));
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sincronizar(); });
-  setInterval(sincronizar, 60000);
+  setInterval(() => { if (document.visibilityState === 'visible') sincronizar(); }, 60000);
   sincronizar();
 }

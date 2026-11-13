@@ -74,7 +74,8 @@ export async function crearDesdeTexto(texto, extra = {}) {
   };
   if (!p.proyectoId && extra.proyectoId) p.proyectoId = extra.proyectoId;
   // Va a la bandeja si le falta información clave
-  if (p.inbox === undefined) p.inbox = !(p.fecha && (p.proyectoId || p.responsable));
+  // Al Inbox va lo que no tiene fecha (lo fechado ya aparece en Hoy / Próximos)
+  if (p.inbox === undefined) p.inbox = !p.fecha;
   return store.guardar('pendientes', p);
 }
 
@@ -210,8 +211,8 @@ export function abrirCaptura(op = {}) {
       if (r.prioridad) ch.push(`<span class="pv pv-${r.prioridad}">${ic('bandera')}${r.prioridad}</span>`);
       if (r.esperando) ch.push(`<span class="pv">${ic('espera')}Esperando</span>`);
       if (r.disciplina) ch.push(`<span class="pv pv-tenue">${esc(r.disciplina)}</span>`);
-      const aInbox = !(r.fecha && (r.proyectoId || r.proyectoNombre || r.responsableNombre));
-      ch.push(`<span class="pv pv-destino">→ ${aInbox ? 'Inbox (falta fecha o proyecto/responsable)' : 'Pendientes'}</span>`);
+      const aInbox = !r.fecha;
+      ch.push(`<span class="pv pv-destino">→ ${aInbox ? 'Inbox (sin fecha: la clasificas después)' : 'Pendientes'}</span>`);
       prev.innerHTML = ch.join('');
     };
     ta.addEventListener('input', pintar);
