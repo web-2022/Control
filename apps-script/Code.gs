@@ -26,7 +26,8 @@ var HOJAS = {
   acuerdos: 'Acuerdos',
   personas: 'Personas',
   proyectos: 'Proyectos',
-  diario: 'Diario'
+  diario: 'Diario',
+  movimientos: 'Caja'
 };
 // Columnas que van primero (el resto se agrega solo cuando aparece un campo nuevo)
 var COLUMNAS_BASE = {
@@ -35,7 +36,8 @@ var COLUMNAS_BASE = {
   acuerdos: ['id', 'reunionId', 'texto', 'responsable', 'fecha', 'pendienteId', 'creado', 'deleted', 'updatedAt', '_srv'],
   personas: ['id', 'nombre', 'rol', 'disciplina', 'email', 'telefono', 'empresa', 'creado', 'deleted', 'updatedAt', '_srv'],
   proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_srv'],
-  diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_srv']
+  diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_srv'],
+  movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'nota', 'creado', 'deleted', 'updatedAt', '_srv']
 };
 
 // ------------------------------------------------------------

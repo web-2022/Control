@@ -1039,6 +1039,7 @@ export function vistaMas() {
     html: `${cab('Más')}
     <div class="mas-lista">
       ${yaInstalada() ? '' : `<a class="mas-item mas-instalar" href="#" data-instalar>${ic('descargar')}<div><b>Instalar app en el celular</b><span>Ícono en tu pantalla, pantalla completa, sin internet</span></div>${ic('flecha')}</a>`}
+      <a class="mas-item" href="#/caja"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><circle cx="16" cy="14.5" r="1.5"/></svg><div><b>Caja</b><span>Tus ingresos y gastos (S/ y US$)</span></div>${ic('flecha')}</a>
       ${it('#/equipo', 'equipo', 'Equipo', 'Carga de trabajo y 1:1')}
       ${it('#/proyectos', 'proyecto', 'Proyectos', 'Fases, hitos y entregables')}
       ${it('#/pendientes?vista=esperando', 'espera', 'Esperando a', 'Lo que delegaste')}

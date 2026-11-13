@@ -156,7 +156,9 @@ export function parsear(texto, ctx = {}) {
   tomar(/\s(?:en|por|de)\s+la\s+(manana|tarde|noche)\b/, (m) => { if (!r.hora) r.hora = pad(PARTE_DIA[m[1]]) + ':00'; });
 
   const buscarFecha = () =>
-    tomar(new RegExp(`\\s${PRE}pasado\\s+manana\\b`), () => ponerFecha(addDias(hoyS, 2)))
+    tomar(/\s(?:anteayer|antes\s+de\s+ayer)\b/, () => ponerFecha(addDias(hoyS, -2)))
+    || tomar(/\s(?:el\s+dia\s+de\s+)?ayer\b/, () => ponerFecha(addDias(hoyS, -1)))
+    || tomar(new RegExp(`\\s${PRE}pasado\\s+manana\\b`), () => ponerFecha(addDias(hoyS, 2)))
     || tomar(/\s(?:para\s+)?(?:hoy|esta\s+(manana|tarde|noche))\b/, (m) => {
       ponerFecha(hoyS);
       if (m[1] && !r.hora) r.hora = pad(PARTE_DIA[m[1]]) + ':00';

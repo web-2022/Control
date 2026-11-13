@@ -3,5 +3,5 @@
   "private": true,
   "type": "module",
   "description": "PWA de control de pendientes, reuniones y equipo (sin dependencias)",
-  "scripts": { "test": "node tests/parser.test.mjs" }
+  "scripts": { "test": "node tests/parser.test.mjs && node tests/caja.test.mjs" }
 }

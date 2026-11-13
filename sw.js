@@ -5,12 +5,12 @@
 // NO se interceptan: van siempre directo a la red.
 // Al publicar cambios, sube el número de VERSION.
 // ============================================================
-const VERSION = 'control-v1.5.0';
+const VERSION = 'control-v1.6.0';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.json', 'css/styles.css',
   'js/app.js', 'js/store.js', 'js/sync.js', 'js/parser.js', 'js/voz.js', 'js/vistas.js',
   'js/modales.js', 'js/componentes.js', 'js/modelo.js', 'js/ui.js', 'js/util.js',
-  'js/catalogo.js', 'js/demo.js', 'js/iconos.js', 'js/diario.js', 'js/instalar.js', 'js/google.js', 'js/bienvenida.js', 'js/compartir.js', 'js/config.js', 'js/alertas.js',
+  'js/catalogo.js', 'js/demo.js', 'js/iconos.js', 'js/diario.js', 'js/instalar.js', 'js/google.js', 'js/bienvenida.js', 'js/compartir.js', 'js/config.js', 'js/alertas.js', 'js/caja.js', 'js/caja-parser.js', 'js/caja-catalogo.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

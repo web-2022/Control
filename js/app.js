@@ -8,6 +8,7 @@ import * as V from './vistas.js';
 import * as MD from './modales.js';
 import { expandidos } from './componentes.js';
 import { vistaDiario } from './diario.js';
+import { vistaCaja } from './caja.js';
 import { iniciarInstalacion, actualizarBotones } from './instalar.js';
 import { vistaBienvenida } from './bienvenida.js';
 import { iniciarCompartir } from './compartir.js';
@@ -35,6 +36,7 @@ const RUTAS = {
   proyecto: (id) => V.vistaProyecto(id),
   revision: () => V.vistaRevision(),
   diario: () => vistaDiario(),
+  caja: () => vistaCaja(),
   ajustes: () => V.vistaAjustes(),
   mas: () => V.vistaMas(),
   bienvenida: () => vistaBienvenida(),
@@ -69,7 +71,7 @@ function render(cambioDeRuta = false) {
 
   // Navegación activa
   const base = { reunion: 'reuniones', persona: 'equipo', proyecto: 'proyectos' }[nombre] || nombre;
-  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes', 'diario'].includes(base))));
+  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes', 'diario', 'caja'].includes(base))));
   actualizarContadores();
   actualizarBotones();
 

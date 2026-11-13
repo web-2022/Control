@@ -110,6 +110,18 @@ export async function cargarDemo() {
   await store.guardarVarios('reuniones', reuniones);
   await store.guardarVarios('pendientes', pendientes);
   await store.guardarVarios('acuerdos', acuerdos);
+  const mv = (dias, tipo, monto, moneda, categoria, descripcion, cuenta) => ({ fecha: d(dias), tipo, monto, moneda, categoria, descripcion, cuenta });
+  await store.guardarVarios('movimientos', [
+    mv(-12, 'ingreso', 8500, 'PEN', 'Sueldo', 'Sueldo noviembre', 'Cuenta sueldo'),
+    mv(-9, 'ingreso', 1200, 'USD', 'Consultoría / honorarios', 'Revisión plan de minado', 'Cuenta sueldo'),
+    mv(-8, 'gasto', 1800, 'PEN', 'Vivienda', 'Alquiler', 'Cuenta sueldo'),
+    mv(-7, 'gasto', 189.9, 'PEN', 'Servicios', 'Internet y celular', 'Tarjeta de crédito'),
+    mv(-5, 'gasto', 950, 'PEN', 'Educación', 'Pensión del colegio', 'Cuenta sueldo'),
+    mv(-3, 'gasto', 15.99, 'USD', 'Suscripciones', 'Netflix', 'Tarjeta de crédito'),
+    mv(-2, 'gasto', 320.5, 'PEN', 'Alimentación', 'Supermercado', 'Tarjeta de crédito'),
+    mv(-1, 'gasto', 18.5, 'PEN', 'Transporte', 'Taxi a la oficina', 'Yape / Plin'),
+    mv(0, 'gasto', 25, 'PEN', 'Alimentación', 'Almuerzo', 'Efectivo'),
+  ]);
   await store.guardarVarios('diario', [{
     id: `dia-${d(-1)}`, fecha: d(-1),
     comentario: 'Día cargado de reuniones con el cliente. Se definió el método de minado base; el riesgo principal sigue siendo la data geotécnica pendiente. Mañana priorizar la secuencia de minado.',

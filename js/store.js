@@ -10,7 +10,7 @@
 // ============================================================
 import { uid, nowIso } from './util.js';
 
-export const TABLAS = ['pendientes', 'reuniones', 'acuerdos', 'personas', 'proyectos', 'diario'];
+export const TABLAS = ['pendientes', 'reuniones', 'acuerdos', 'personas', 'proyectos', 'diario', 'movimientos'];
 
 const DB_NOMBRE = 'control-db';
 const CLAVE_CONFIG = 'control.config';
@@ -23,7 +23,7 @@ const oyentes = new Set();
 // ---------------- IndexedDB (envoltorio mínimo) ----------------
 function abrirDB() {
   return new Promise((ok, mal) => {
-    const req = indexedDB.open(DB_NOMBRE, 2); // v2: tabla diario
+    const req = indexedDB.open(DB_NOMBRE, 3); // v2: diario · v3: movimientos (Caja)
     req.onupgradeneeded = () => {
       for (const t of TABLAS) if (!req.result.objectStoreNames.contains(t)) req.result.createObjectStore(t, { keyPath: 'id' });
     };
@@ -61,6 +61,7 @@ const CONFIG_DEFECTO = {
   apiUrl: '', token: '', miNombre: '', lastSync: '', tema: 'auto',
   notificaciones: false, avisoMin: 15, disciplinas: null, demo: false,
   modo: '', googleEmail: '', googleNombre: '', sheetId: '', sheetUrl: '',
+  cajaCuentas: null, cajaPresupuestos: null, tipoCambio: '',
 };
 export function config() {
   try { return { ...CONFIG_DEFECTO, ...JSON.parse(localStorage.getItem(CLAVE_CONFIG) || '{}') }; }
