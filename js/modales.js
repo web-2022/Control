@@ -10,6 +10,7 @@ import { ic } from './iconos.js';
 import { esc, hoy, addDias, fmtFecha, uid, fmtMomento } from './util.js';
 import { COLORES, FASES, ENTREGABLES_TIPICOS } from './catalogo.js';
 import * as C from './componentes.js';
+import { OPCIONES_AVISO, botonesCalendario } from './alertas.js';
 
 // ============================================================
 // Acciones rápidas sobre pendientes
@@ -273,8 +274,12 @@ export function editarPendiente(id, defecto = {}) {
     <div class="fila-campos">
       <label class="campo"><span>Fecha compromiso</span><input type="date" name="fecha" value="${esc(p.fecha || '')}"></label>
       <label class="campo campo-corto"><span>Hora</span><input type="time" name="hora" value="${esc(p.hora || '')}"></label>
+      <label class="campo campo-corto"><span>Avisarme</span><select name="avisoMin">${OPCIONES_AVISO.map(([v, t]) => `<option value="${v}" ${String(p.avisoMin ?? '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
+    </div>
+    <div class="fila-campos">
       <label class="campo"><span>Estado</span><select name="estado">${C.optsEstados(p.estado)}</select></label>
     </div>
+    ${id && p.fecha && p.hora ? `<div class="botones-rapidos cal-botones">${botonesCalendario('pendiente', p)}</div>` : ''}
     <div class="campo"><span>Prioridad</span>
       <div class="segmentado">${['alta', 'media', 'baja'].map((x) => `<label class="seg seg-${x}"><input type="radio" name="prioridad" value="${x}" ${p.prioridad === x ? 'checked' : ''}><span>${x[0].toUpperCase() + x.slice(1)}</span></label>`).join('')}</div>
     </div>
@@ -356,6 +361,7 @@ export function editarReunion(id, defecto = {}, alGuardar) {
       <label class="campo"><span>Fecha</span><input type="date" name="fecha" required value="${esc(r.fecha || '')}"></label>
       <label class="campo campo-corto"><span>Hora</span><input type="time" name="hora" value="${esc(r.hora || '')}"></label>
       <label class="campo campo-corto"><span>Duración (min)</span><input type="number" name="duracion" min="5" step="5" value="${esc(r.duracion || 60)}"></label>
+      <label class="campo campo-corto"><span>Avisarme</span><select name="avisoMin">${OPCIONES_AVISO.map(([v, t]) => `<option value="${v}" ${String(r.avisoMin ?? '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     </div>
     <div class="fila-campos">
       <label class="campo"><span>Proyecto</span><select name="proyectoId">${C.optsProyectos(r.proyectoId)}</select></label>

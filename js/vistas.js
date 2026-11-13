@@ -16,6 +16,7 @@ import { escuchar, vozDisponible } from './voz.js';
 import { cargarDemo } from './demo.js';
 import { abrirCierreDia, cierreDe } from './diario.js';
 import { puedeInstalar, yaInstalada } from './instalar.js';
+import { activarAvisos, permisoNotif, probarAviso, botonesCalendario, descargarAgendaICS } from './alertas.js';
 import { toast, confirmar, copiar, descargar, modal, sinRefrescar, leerForm } from './ui.js';
 import { ic } from './iconos.js';
 import { esc, hoy, addDias, fmtFecha, fmtFechaLarga, diffDias, inicioSemana, agrupar, norm, debounce, uid, fechaLocal, fmtMomento } from './util.js';
@@ -88,6 +89,7 @@ export function vistaHoy() {
   ${new Date().getHours() >= 17 && !cierreDe(H) ? `<div class="aviso aviso-cierre">${ic('reloj')}<span><b>¿Terminando el día?</b> Haz tu cierre: revisa lo hecho, comenta y pasa lo pendiente a mañana.</span><button class="btn btn-mini btn-pri" data-cierre-dia>Cierre del día</button></div>` : ''}
   ${cfg.demo ? `<div class="aviso">${ic('campana')}<span>Estás viendo <b>datos de ejemplo</b>. Explora la app y cuando quieras empieza con los tuyos.</span><button class="btn btn-mini" data-borrar-demo>Borrar ejemplo y empezar</button></div>` : ''}
   ${puedeInstalar() && !localStorage.getItem('control.ocultarInstalar') ? `<div class="aviso aviso-instalar">${ic('descargar')}<span><b>Instala Control en tu celular</b> para abrirla desde un ícono, a pantalla completa y sin internet.</span><button class="btn btn-mini btn-pri" data-instalar>Instalar</button><button class="icon-btn" data-ocultar-instalar title="No mostrar más">${ic('x')}</button></div>` : ''}
+  ${!cfg.notificaciones && permisoNotif() !== 'unsupported' && !localStorage.getItem('control.ocultarAvisos') ? `<div class="aviso aviso-avisos">${ic('campana')}<span><b>Activa los avisos</b> para que te recuerde antes de tus reuniones y pendientes con hora.</span><button class="btn btn-mini btn-pri" data-activar-avisos>Activar avisos</button><button class="icon-btn" data-ocultar-avisos title="No mostrar más">${ic('x')}</button></div>` : ''}
   ${capturaLinea('Captura rápida: “mañana 10am revisar CAPEX con @Ana #Huaylla”  (Enter)')}
   <div class="kpis">
     ${kpi(venc.length, 'Vencidos', '#/pendientes?rango=vencidos', venc.length ? 'kpi-rojo' : '', 'reloj')}
@@ -120,9 +122,15 @@ export function vistaHoy() {
 
   return {
     titulo: 'Hoy', html,
-    montar(el) {
+    montar(el, refrescar) {
       montarCapturaLinea(el);
       el.querySelectorAll('[data-cierre-dia]').forEach((b) => b.onclick = () => abrirCierreDia());
+      el.querySelector('[data-activar-avisos]')?.addEventListener('click', async () => {
+        if (await activarAvisos()) { probarAviso(); refrescar(); }
+      });
+      el.querySelector('[data-ocultar-avisos]')?.addEventListener('click', (e) => {
+        localStorage.setItem('control.ocultarAvisos', '1'); e.target.closest('.aviso').remove();
+      });
       el.querySelector('[data-ocultar-instalar]')?.addEventListener('click', (e) => {
         localStorage.setItem('control.ocultarInstalar', '1'); e.target.closest('.aviso').remove();
       });
@@ -374,13 +382,16 @@ export function vistaReuniones() {
   const prox = todas.filter((r) => r.fecha > H).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
   const pas = todas.filter((r) => r.fecha < H).sort((a, b) => (b.fecha + b.hora).localeCompare(a.fecha + a.hora)).slice(0, 30);
   const html = `
-  ${cab('Reuniones', 'Agenda, minutas y acuerdos convertidos en acciones', `<button class="btn btn-pri" data-nueva>${ic('mas2')} Nueva reunión</button>`)}
+  ${cab('Reuniones', 'Agenda, minutas y acuerdos convertidos en acciones', `<button class="btn" data-agenda-ics title="Agregar tus próximas reuniones y pendientes con hora a tu calendario">📅 <span class="solo-desk">Exportar a mi calendario</span></button><button class="btn btn-pri" data-nueva>${ic('mas2')} Nueva reunión</button>`)}
   ${C.seccion('Hoy', deHoy.length ? `<div class="lista">${deHoy.map(tarjetaReunion).join('')}</div>` : '<div class="vacio">Sin reuniones hoy</div>', { n: deHoy.length, icono: 'hoy' })}
   ${C.seccion('Próximas', prox.length ? `<div class="lista">${prox.map(tarjetaReunion).join('')}</div>` : '<div class="vacio">No hay reuniones programadas</div>', { n: prox.length, icono: 'calendario' })}
   ${pas.length ? C.seccion('Anteriores', `<div class="lista">${pas.map(tarjetaReunion).join('')}</div>`, { n: pas.length, icono: 'revision' }) : ''}`;
   return {
     titulo: 'Reuniones', html,
-    montar(el) { el.querySelector('[data-nueva]').onclick = () => MD.editarReunion(null, {}, (r) => { location.hash = `#/reunion/${r.id}`; }); },
+    montar(el) {
+      el.querySelector('[data-nueva]').onclick = () => MD.editarReunion(null, {}, (r) => { location.hash = `#/reunion/${r.id}`; });
+      el.querySelector('[data-agenda-ics]').onclick = () => descargarAgendaICS(14);
+    },
   };
 }
 
@@ -423,6 +434,7 @@ export function vistaReunion(id) {
     ${r.estado !== 'Realizada' ? `<button class="btn btn-mini" data-realizada>${ic('check')} Marcar realizada</button>` : ''}
   </div>
   ${r.objetivo ? `<p class="objetivo"><b>Objetivo:</b> ${esc(r.objetivo)}</p>` : ''}
+  ${r.fecha && r.hora ? `<div class="botones-rapidos cal-botones">${botonesCalendario('reunion', r)}</div>` : ''}
   <div class="rejilla-2">
     <div>
       ${C.seccion('Acuerdos', `
@@ -823,10 +835,21 @@ export function vistaAjustes() {
     </section>
 
     <section class="tarjeta">
-      <h3>${ic('campana')} Alertas</h3>
-      <label class="check-linea"><input type="checkbox" id="aj-notif" ${cfg.notificaciones ? 'checked' : ''}> Notificaciones del navegador (vencimientos y reuniones)</label>
-      <label class="campo campo-corto"><span>Avisar minutos antes</span><input type="number" id="aj-aviso" min="0" max="240" value="${esc(cfg.avisoMin)}"></label>
-      <p class="nota">Funcionan mientras la app esté abierta o instalada. Para un correo diario a las 7:00 con tu resumen, ejecuta <code>activarResumenDiario</code> en Apps Script.</p>
+      <h3>${ic('campana')} Avisos</h3>
+      <p class="nota">Te aviso antes de tus reuniones y pendientes que tengan <b>fecha y hora</b>, con notificación, sonido y vibración. Funcionan mientras la app está abierta o minimizada.</p>
+      ${permisoNotif() === 'unsupported' ? '<p class="nota rojo">Este navegador no permite notificaciones.</p>'
+        : cfg.notificaciones && permisoNotif() === 'granted' ? '<p class="nota">✔ Avisos activados en este dispositivo.</p>'
+          : permisoNotif() === 'denied' ? '<p class="nota rojo">Las notificaciones están bloqueadas en este navegador. Desbloquéalas en el candado de la barra de direcciones (o Ajustes del teléfono → Apps → Chrome → Notificaciones) y vuelve a pulsar Activar.</p>' : ''}
+      <div class="botones-rapidos">
+        ${cfg.notificaciones && permisoNotif() === 'granted' ? `<button class="btn" data-desactivar-avisos>Desactivar avisos</button>` : `<button class="btn btn-pri" data-activar-avisos>${ic('campana')} Activar avisos</button>`}
+        <button class="btn" data-probar-aviso>Probar aviso</button>
+      </div>
+      <label class="campo campo-corto"><span>Aviso predeterminado</span><select id="aj-aviso">
+        ${[['0', 'A la hora'], ['5', '5 min antes'], ['10', '10 min antes'], ['15', '15 min antes'], ['30', '30 min antes'], ['60', '1 hora antes'], ['120', '2 horas antes'], ['1440', '1 día antes']].map(([v, t]) => `<option value="${v}" ${String(cfg.avisoMin) === v ? 'selected' : ''}>${t}</option>`).join('')}
+      </select></label>
+      <p class="nota"><b>¿Quieres el aviso aunque la app esté cerrada?</b> En cada pendiente o reunión con hora pulsa <b>“Agregar a Google Calendar”</b>, o exporta toda tu agenda:</p>
+      <div class="botones-rapidos"><button class="btn" data-agenda-ics>📅 Exportar agenda de 14 días (.ics)</button></div>
+      <p class="nota">Correo diario a las 7:00: solo con la conexión avanzada (Apps Script → <code>activarResumenDiario</code>).</p>
     </section>
 
     <section class="tarjeta">
@@ -883,16 +906,11 @@ export function vistaAjustes() {
       $('#aj-nombre').addEventListener('change', (e) => { store.guardarConfig({ miNombre: e.target.value.trim() }); toast('Nombre guardado'); });
       $('#aj-tema').addEventListener('change', (e) => { store.guardarConfig({ tema: e.target.value }); document.documentElement.dataset.tema = e.target.value; });
       $('#aj-voz').addEventListener('change', (e) => { localStorage.setItem('control.vozIdioma', e.target.value); toast('Idioma de dictado guardado'); });
-      $('#aj-aviso').addEventListener('change', (e) => store.guardarConfig({ avisoMin: Number(e.target.value) || 0 }));
-      $('#aj-notif').addEventListener('change', async (e) => {
-        if (e.target.checked) {
-          if (!('Notification' in window)) { toast('Este navegador no soporta notificaciones'); e.target.checked = false; return; }
-          const perm = await Notification.requestPermission();
-          if (perm !== 'granted') { toast('Permiso denegado por el navegador'); e.target.checked = false; return; }
-        }
-        store.guardarConfig({ notificaciones: e.target.checked });
-        toast(e.target.checked ? 'Alertas activadas' : 'Alertas desactivadas');
-      });
+      $('#aj-aviso').addEventListener('change', (e) => { store.guardarConfig({ avisoMin: Number(e.target.value) || 0 }); toast('Aviso predeterminado guardado'); });
+      $('[data-activar-avisos]')?.addEventListener('click', async () => { if (await activarAvisos()) { probarAviso(); refrescar(); } else refrescar(); });
+      $('[data-desactivar-avisos]')?.addEventListener('click', () => { store.guardarConfig({ notificaciones: false }); toast('Avisos desactivados'); refrescar(); });
+      $('[data-probar-aviso]').onclick = () => probarAviso();
+      $('[data-agenda-ics]').onclick = () => descargarAgendaICS(14);
 
       $('[data-google]')?.addEventListener('click', async (e) => {
         e.currentTarget.disabled = true;

@@ -600,3 +600,7 @@ body.modo-limpio .vista { margin: 0 auto; padding: 0 20px 60px; max-width: 1040p
 .avanzado .campo { margin-bottom: 10px; }
 .bv-legal { text-align: center; font-size: 13px; margin: -18px 0 0; }
 .bv-legal a { color: var(--tenue); }
+.aviso-avisos { background: var(--azul-suave); border-color: color-mix(in srgb, var(--azul) 35%, transparent); }
+.aviso-avisos .ic { color: var(--azul); }
+.cal-botones { margin: 2px 0 12px; }
+.cal-botones .btn { font-size: 12.5px; }

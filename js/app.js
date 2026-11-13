@@ -11,6 +11,7 @@ import { iniciarInstalacion, actualizarBotones } from './instalar.js';
 import { vistaBienvenida } from './bienvenida.js';
 import { iniciarCompartir } from './compartir.js';
 import * as G from './google.js';
+import { iniciarAlertas } from './alertas.js';
 import { iniciarAuto, alCambiarEstado, sincronizar, estadoSync, reconectarGoogle, conectado } from './sync.js';
 import { cerrarModalSuperior, hayModal, enSilencio, toast } from './ui.js';
 import { ic } from './iconos.js';
@@ -136,40 +137,6 @@ function pintarSync(es) {
   }[es.estado] || es.estado;
 }
 
-// ---------------- Alertas (notificaciones) ----------------
-function revisarAlertas() {
-  const cfg = store.config();
-  if (!cfg.notificaciones || !('Notification' in window) || Notification.permission !== 'granted') return;
-  const H = hoy();
-  const ahora = new Date();
-  const min = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
-  const ahoraMin = ahora.getHours() * 60 + ahora.getMinutes();
-  const aviso = Number(cfg.avisoMin) || 15;
-  let avisados = {};
-  try { avisados = JSON.parse(localStorage.getItem('control.avisados') || '{}'); } catch { /* */ }
-  const avisar = (clave, titulo, cuerpo, url) => {
-    if (avisados[clave]) return;
-    avisados[clave] = H;
-    const op = { body: cuerpo, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: clave, data: { url } };
-    navigator.serviceWorker?.ready.then((reg) => reg.showNotification(titulo, op)).catch(() => new Notification(titulo, op));
-  };
-  // Resumen de vencidos una vez al día
-  const venc = M.vencidos();
-  if (venc.length) avisar(`venc-${H}`, `${venc.length} pendientes vencidos`, venc.slice(0, 4).map((p) => '• ' + p.titulo).join('\n'), '#/pendientes?rango=vencidos');
-  // Pendientes con hora y reuniones próximas
-  for (const p of M.deHoy().filter((x) => x.hora)) {
-    const d = min(p.hora) - ahoraMin;
-    if (d >= 0 && d <= aviso) avisar(`p-${p.id}-${p.fecha}-${p.hora}`, `⏰ ${p.titulo}`, `Hoy a las ${p.hora}`, '#/hoy');
-  }
-  for (const r of M.reunionesDe(H).filter((x) => x.hora && x.estado === 'Programada')) {
-    const d = min(r.hora) - ahoraMin;
-    if (d >= 0 && d <= aviso) avisar(`r-${r.id}-${r.fecha}-${r.hora}`, `📅 ${r.titulo}`, `Empieza a las ${r.hora}`, `#/reunion/${r.id}`);
-  }
-  // Limpiar avisos antiguos
-  for (const k of Object.keys(avisados)) if (avisados[k] < H) delete avisados[k];
-  localStorage.setItem('control.avisados', JSON.stringify(avisados));
-}
-
 // ---------------- Arranque ----------------
 async function iniciar() {
   const cfg = store.config();
@@ -231,8 +198,7 @@ async function iniciar() {
   else if (qs.has('capturar')) MD.abrirCaptura();
   if (qs.has('voz') || qs.has('capturar')) history.replaceState(null, '', location.pathname + location.hash);
 
-  setInterval(revisarAlertas, 60000);
-  setTimeout(revisarAlertas, 3000);
+  iniciarAlertas();
   // Al cambiar de día, refrescar (vencidos, hoy)
   let dia = hoy();
   setInterval(() => { if (hoy() !== dia) { dia = hoy(); render(false); } }, 60000);
