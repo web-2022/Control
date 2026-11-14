@@ -27,7 +27,8 @@ var HOJAS = {
   personas: 'Personas',
   proyectos: 'Proyectos',
   diario: 'Diario',
-  movimientos: 'Caja'
+  movimientos: 'Caja',
+  cuentas: 'Cuentas'
 };
 // Columnas que van primero (el resto se agrega solo cuando aparece un campo nuevo)
 var COLUMNAS_BASE = {
@@ -37,7 +38,8 @@ var COLUMNAS_BASE = {
   personas: ['id', 'nombre', 'rol', 'disciplina', 'email', 'telefono', 'empresa', 'creado', 'deleted', 'updatedAt', '_srv'],
   proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_srv'],
   diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_srv'],
-  movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'nota', 'creado', 'deleted', 'updatedAt', '_srv']
+  movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'destino', 'nota', 'creado', 'deleted', 'updatedAt', '_srv'],
+  cuentas: ['id', 'nombre', 'tipo', 'moneda', 'saldoInicial', 'fechaSaldo', 'saldoEn', 'cuota', 'diaPago', 'categoria', 'nota', 'orden', 'activo', 'creado', 'deleted', 'updatedAt', '_srv']
 };
 
 // ------------------------------------------------------------

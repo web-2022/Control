@@ -111,6 +111,16 @@ export async function cargarDemo() {
   await store.guardarVarios('pendientes', pendientes);
   await store.guardarVarios('acuerdos', acuerdos);
   const mv = (dias, tipo, monto, moneda, categoria, descripcion, cuenta) => ({ fecha: d(dias), tipo, monto, moneda, categoria, descripcion, cuenta });
+  const ahoraIso = new Date(Date.now() - 86400000 * 13).toISOString();
+  await store.guardarVarios('cuentas', [
+    { nombre: 'Efectivo', tipo: 'liquida', moneda: 'PEN', saldoInicial: 600, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 0, activo: true },
+    { nombre: 'Cuenta sueldo', tipo: 'liquida', moneda: 'PEN', saldoInicial: 4200, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 1, activo: true },
+    { nombre: 'Yape / Plin', tipo: 'liquida', moneda: 'PEN', saldoInicial: 150, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 2, activo: true },
+    { nombre: 'Hipoteca', tipo: 'prestamo', moneda: 'PEN', saldoInicial: 200000, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: 5200, diaPago: 15, orden: 3, activo: true, nota: 'Ejemplo' },
+    { nombre: 'Tarjeta de crédito', tipo: 'tarjeta', moneda: 'PEN', saldoInicial: 1200, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: '', diaPago: 25, orden: 4, activo: true },
+    { nombre: 'Alquiler', tipo: 'fijo', moneda: 'PEN', cuota: 1800, diaPago: 5, categoria: 'Vivienda', orden: 5, activo: true },
+    { nombre: 'Pensión del colegio', tipo: 'fijo', moneda: 'PEN', cuota: 950, diaPago: 8, categoria: 'Educación', orden: 6, activo: true },
+  ]);
   await store.guardarVarios('movimientos', [
     mv(-12, 'ingreso', 8500, 'PEN', 'Sueldo', 'Sueldo noviembre', 'Cuenta sueldo'),
     mv(-9, 'ingreso', 1200, 'USD', 'Consultoría / honorarios', 'Revisión plan de minado', 'Cuenta sueldo'),

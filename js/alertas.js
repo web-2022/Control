@@ -12,6 +12,7 @@ import * as M from './modelo.js';
 import { toast, descargar } from './ui.js';
 import { hoy, addDias, pad, fmtFecha } from './util.js';
 import { URL_APP } from './config.js';
+import { compromisos } from './caja-modelo.js';
 
 // Opciones de aviso (minutos antes). '' = usar el predeterminado de Ajustes.
 export const OPCIONES_AVISO = [
@@ -195,6 +196,19 @@ export function revisarAlertas() {
     if (!avisados[kHora] && ahora >= inicio && ahora < inicio + 10 * 60000) {
       avisados[kHora] = H;
       avisar({ clave: kHora, titulo: `${icono} Ahora: ${r.titulo}`, cuerpo: tipo === 'reunion' ? `Empieza a las ${r.hora}` : `Programado para las ${r.hora}`, url });
+    }
+  }
+  // Pagos de deudas y gastos fijos: 3 días antes y el mismo día (desde las 8:00)
+  if (new Date().getHours() >= 8) {
+    for (const x of compromisos(H.slice(0, 7), Number(store.config().tipoCambio) || 0)) {
+      if (x.estado === 'pagado') continue;
+      const faltan = Math.round((new Date(x.fecha + 'T00:00:00') - new Date(H + 'T00:00:00')) / 86400000);
+      if (faltan !== 3 && faltan !== 0) continue;
+      const k = `comp-${x.c.id}-${x.fecha}-${faltan}`;
+      if (avisados[k]) continue;
+      avisados[k] = H;
+      const monto = `${x.moneda === 'USD' ? 'US$' : 'S/'} ${x.pendiente.toFixed(2)}`;
+      avisar({ clave: k, titulo: `🏦 ${faltan ? 'En 3 días' : 'Hoy'} vence: ${x.c.nombre}`, cuerpo: `${monto} · día ${Number(x.fecha.slice(8))}`, url: '#/caja' });
     }
   }
   // Resumen de vencidos una vez al día

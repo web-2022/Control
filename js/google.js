@@ -17,7 +17,7 @@ const CLAVE_TOKEN = 'control.gtoken';
 
 export const HOJAS = {
   pendientes: 'Pendientes', reuniones: 'Reuniones', acuerdos: 'Acuerdos',
-  personas: 'Personas', proyectos: 'Proyectos', diario: 'Diario', movimientos: 'Caja',
+  personas: 'Personas', proyectos: 'Proyectos', diario: 'Diario', movimientos: 'Caja', cuentas: 'Cuentas',
 };
 // Columnas de cada hoja. Los campos que no estén aquí van en "_extra" (JSON).
 export const COLUMNAS = {
@@ -27,7 +27,8 @@ export const COLUMNAS = {
   personas: ['id', 'nombre', 'rol', 'disciplina', 'email', 'telefono', 'empresa', 'creado', 'deleted', 'updatedAt', '_extra'],
   proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_extra'],
   diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_extra'],
-  movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'nota', 'creado', 'deleted', 'updatedAt', '_extra'],
+  movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'destino', 'nota', 'creado', 'deleted', 'updatedAt', '_extra'],
+  cuentas: ['id', 'nombre', 'tipo', 'moneda', 'saldoInicial', 'fechaSaldo', 'saldoEn', 'cuota', 'diaPago', 'categoria', 'nota', 'orden', 'activo', 'creado', 'deleted', 'updatedAt', '_extra'],
 };
 
 /** Error que indica que hay que volver a iniciar sesión (token vencido). */
