@@ -34,6 +34,20 @@ export const cuentas = () => store.todos('cuentas').filter((c) => c.activo !== f
   .sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99) || a.nombre.localeCompare(b.nombre));
 export const deTipo = (...tipos) => cuentas().filter((c) => tipos.includes(c.tipo));
 export const buscarCuenta = (nombre) => (nombre ? cuentas().find((c) => norm(c.nombre) === norm(nombre)) || null : null);
+/** Cuenta que se usa cuando no dices con qué pagaste (la marcada ★, o la primera). */
+export function cuentaDefecto() {
+  const l = deTipo('liquida');
+  return (buscarCuenta(store.config().cajaCuentaDefecto) && l.find((c) => norm(c.nombre) === norm(store.config().cajaCuentaDefecto))) || l[0] || null;
+}
+/** Gastos e ingresos sin cuenta que deberían contar en el efectivo (posteriores a tus saldos). */
+export function sinCuenta() {
+  const l = deTipo('liquida');
+  if (!l.length) return [];
+  // Solo los que contarían en alguna cuenta (posteriores a su saldo registrado)
+  return movimientos().filter((m) => (m.tipo === 'gasto' || m.tipo === 'ingreso' || !m.tipo) && !(m.cuenta || '').trim() && l.some((c) => posterior(m, c)))
+    .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+}
+
 /** Bancos registrados, en el orden de sus cuentas. */
 export const bancos = () => [...new Set(cuentas().map((c) => (c.banco || '').trim()).filter(Boolean))];
 

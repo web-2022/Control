@@ -61,7 +61,7 @@ const CONFIG_DEFECTO = {
   apiUrl: '', token: '', miNombre: '', lastSync: '', tema: 'auto',
   notificaciones: false, avisoMin: 15, disciplinas: null, demo: false,
   modo: '', googleEmail: '', googleNombre: '', sheetId: '', sheetUrl: '',
-  cajaCuentas: null, cajaPresupuestos: null, tipoCambio: '',
+  cajaCuentas: null, cajaPresupuestos: null, cajaCuentaDefecto: '', tipoCambio: '',
 };
 export function config() {
   try { return { ...CONFIG_DEFECTO, ...JSON.parse(localStorage.getItem(CLAVE_CONFIG) || '{}') }; }

@@ -723,3 +723,12 @@ body.modo-limpio .vista { margin: 0 auto; padding: 0 20px 60px; max-width: 1040p
 .opcion-grande:hover { border-color: var(--acento); }
 .opcion-grande small { color: var(--tenue); font-size: 12.5px; }
 @media (max-width: 520px) { .comp { flex-wrap: wrap; } .comp-btns { width: 100%; justify-content: flex-end; } }
+.aviso-sincuenta { background: var(--rojo-suave); border-color: color-mix(in srgb, var(--rojo) 40%, transparent); }
+.aviso-sincuenta .ic { color: var(--rojo); }
+em.defecto { font-style: normal; font-size: 11px; color: var(--acento); font-weight: 600; }
+.lista-asignar { display: flex; flex-direction: column; max-height: 45vh; overflow: auto; border: 1px solid var(--borde); border-radius: var(--radio); }
+.asig-fila { display: grid; grid-template-columns: 1fr minmax(0, 46%); gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--borde); }
+.asig-fila:last-child { border-bottom: 0; }
+.asig-fila span { display: flex; flex-direction: column; min-width: 0; }
+.asig-fila small { color: var(--tenue); font-size: 12px; }
+.asig-fila select { min-width: 0; }

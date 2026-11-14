@@ -68,22 +68,26 @@ export async function crearMovimientoDesdeTexto(texto) {
     editarMovimiento(null, { ...r, textoOriginal: texto.trim() });
     return null;
   }
+  // Sin cuenta: se usa tu cuenta por defecto (para que el efectivo siempre se actualice)
+  let porDefecto = false;
+  if (!r.cuenta && (r.tipo === 'gasto' || r.tipo === 'ingreso') && CM.cuentaDefecto()) { r.cuenta = CM.cuentaDefecto().nombre; porDefecto = true; }
   // ¿Es uno de tus ingresos mensuales (sueldo, clases…)? Se marca como cobrado.
   const fijo = r.tipo === 'ingreso' ? CM.deTipo('ingreso').find((c) => norm(texto).includes(norm(c.nombre))) : null;
-  if (fijo && !r.cuenta && fijo.destino) r.cuenta = fijo.destino;
+  if (fijo && fijo.destino && (porDefecto || !r.cuenta)) r.cuenta = fijo.destino;
   const m = await store.guardar('movimientos', { ...r, ...(fijo ? { fijoId: fijo.id } : {}), textoOriginal: texto.trim() });
   const signo = m.tipo === 'ingreso' ? '＋' : m.tipo === 'transferencia' ? '⇄' : '−';
   const etiqueta = m.tipo === 'pago' ? `Pago a ${m.destino}` : m.tipo === 'transferencia' ? `${m.cuenta} → ${m.destino}` : m.categoria;
   const acciones = [{ texto: 'Editar', fn: () => editarMovimiento(m.id) }];
   const deuda = m.tipo === 'pago' ? CM.buscarCuenta(m.destino) : null;
   if (deuda) acciones.unshift({ texto: 'Nuevo saldo de la deuda', fn: () => editarCuenta(deuda.id, { soloSaldo: true }) });
-  toast(`${signo} ${dinero(m.monto, m.moneda)} · ${etiqueta}`, acciones, 7000);
+  if (porDefecto && !fijo) acciones[acciones.length - 1] = { texto: 'Cambiar cuenta', fn: () => editarMovimiento(m.id) };
+  toast(`${signo} ${dinero(m.monto, m.moneda)} · ${etiqueta}${m.cuenta && m.tipo !== 'pago' && m.tipo !== 'transferencia' ? ' · ' + m.cuenta : ''}`, acciones, 7000);
   return m;
 }
 
 // ---------------- Editor de movimientos ----------------
 export function editarMovimiento(id, defecto = {}) {
-  const m = id ? store.obtener('movimientos', id) : { tipo: 'gasto', moneda: 'PEN', fecha: hoy(), ...defecto };
+  const m = id ? store.obtener('movimientos', id) : { tipo: 'gasto', moneda: 'PEN', fecha: hoy(), cuenta: (defecto.tipo || 'gasto') === 'transferencia' ? '' : CM.cuentaDefecto()?.nombre || '', ...defecto };
   if (!m) return;
   const tipo0 = m.tipo || 'gasto';
   const optsCat = (tipo, sel) => (tipo === 'ingreso' ? CATEGORIAS_INGRESO : CATEGORIAS_GASTO)
@@ -196,6 +200,7 @@ export function editarCuenta(id, op = {}) {
     </div>` : ''}
     ${(t === 'fijo' || t === 'ingreso') && !op.soloSaldo ? `<label class="campo campo-full"><span>Categoría</span><select name="categoria">${(t === 'ingreso' ? CATEGORIAS_INGRESO : CATEGORIAS_GASTO).map((x) => `<option ${x.nombre === c.categoria ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>` : ''}
     ${t === 'ingreso' && !op.soloSaldo ? `<label class="campo campo-full"><span>¿A qué cuenta te llega?</span><select name="destino"><option value="">— Sin especificar —</option>${CM.nombresCuentas(['liquida']).map((n) => `<option ${n === c.destino ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
+    ${t === 'liquida' && !op.soloSaldo ? `<label class="check-linea"><input type="checkbox" name="porDefecto" ${id && CM.cuentaDefecto()?.id === id ? 'checked' : ''}> Usar por defecto cuando no diga con qué pagué</label>` : ''}
     ${op.soloSaldo ? '' : `<label class="campo campo-full"><span>Nota</span><input name="nota" value="${esc(c.nota || '')}" placeholder="${t === 'prestamo' ? 'Ej.: Banco, tasa, plazo, fecha final' : ''}"></label>`}
     <div class="acciones-modal">
       ${id && !op.soloSaldo ? `<button type="button" class="btn btn-peligro-txt" data-borrar>${ic('basura')} Eliminar</button>` : ''}
@@ -208,6 +213,7 @@ export function editarCuenta(id, op = {}) {
       e.preventDefault();
       const d = leerForm(e.target);
       const saldo = d.saldo; delete d.saldo;
+      const porDefecto = d.porDefecto; delete d.porDefecto;
       if (d.cuota !== undefined) d.cuota = d.cuota === '' ? '' : Number(d.cuota);
       if (d.diaPago !== undefined) d.diaPago = Number(d.diaPago) || '';
       const previo = id ? store.obtener('cuentas', id) : null;
@@ -225,6 +231,8 @@ export function editarCuenta(id, op = {}) {
       if (!id && CM.buscarCuenta(d.nombre)) { toast(`Ya tienes una cuenta llamada “${d.nombre}”. Usa otro nombre.`); return; }
       const g = await store.guardar('cuentas', { ...(id ? { id } : { tipo: t, activo: true, orden: CM.cuentas().length }), ...d });
       if (saldo !== undefined && saldo !== '' && (!id || Number(saldo) !== saldoActual)) await CM.fijarSaldo(g, Number(saldo));
+      if (porDefecto) store.guardarConfig({ cajaCuentaDefecto: g.nombre });
+      else if (t === 'liquida' && id && norm(store.config().cajaCuentaDefecto) === norm(previo?.nombre || '')) store.guardarConfig({ cajaCuentaDefecto: '' });
       toast('Guardado');
       cerrar();
     });
@@ -342,6 +350,30 @@ function yaPagado(x) {
     el.querySelector('[data-op="registrar"]').onclick = () => { cerrar(); pagarCompromiso(x); };
     el.querySelector('[data-op="saldo"]')?.addEventListener('click', () => { cerrar(); editarCuenta(c.id, { soloSaldo: true }); });
   });
+}
+
+/** Asignar cuenta a los gastos e ingresos que quedaron sin cuenta. */
+function asignarCuenta() {
+  const lista = CM.sinCuenta();
+  const opts = CM.deTipo('liquida', 'tarjeta');
+  const sel = (n, tipo) => `<select name="${n}">${opts.filter((c) => tipo !== 'ingreso' || c.tipo === 'liquida').map((c) => `<option ${c.id === CM.cuentaDefecto()?.id ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select>`;
+  modal('Asignar cuenta', `<form class="form">
+    <p class="nota">Elige con qué cuenta hiciste cada movimiento. Así se restan (o suman) de tu efectivo disponible.</p>
+    <label class="campo campo-full"><span>Poner todos en</span>${sel('todos', 'gasto')}</label>
+    <div class="lista-asignar">${lista.map((m, i) => `<div class="asig-fila"><span><b>${esc(m.descripcion || m.categoria)}</b><small>${esc(fmtFecha(m.fecha))} · ${m.tipo === 'ingreso' ? '+' : '−'}${dinero(m.monto, m.moneda)}</small></span>${sel('c' + i, m.tipo)}</div>`).join('')}</div>
+    <label class="check-linea"><input type="checkbox" name="defecto" checked> Usar esta cuenta por defecto cuando no diga con qué pagué</label>
+    <div class="acciones-modal"><span class="sep"></span><button class="btn btn-pri">Guardar</button></div>
+  </form>`, (el, cerrar) => {
+    const f = el.querySelector('form');
+    f.todos.addEventListener('change', () => lista.forEach((m, i) => { const s2 = f['c' + i]; if ([...s2.options].some((o) => o.value === f.todos.value)) s2.value = f.todos.value; }));
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      for (const [i, m] of lista.entries()) await store.guardar('movimientos', { id: m.id, cuenta: f['c' + i].value });
+      if (f.defecto.checked && CM.buscarCuenta(f.todos.value)?.tipo === 'liquida') store.guardarConfig({ cajaCuentaDefecto: f.todos.value });
+      toast(`Listo: ${lista.length} movimiento${lista.length > 1 ? 's' : ''} con cuenta. Tu efectivo ya está actualizado.`);
+      cerrar();
+    });
+  }, { ancho: 'ancho' });
 }
 
 /** Botón "Cobrado" de un ingreso esperado. */
@@ -529,7 +561,7 @@ export function vistaCaja() {
         const detalle = c.tipo === 'fijo' || c.tipo === 'ingreso' ? `${dinero(c.cuota || 0, c.moneda)} · día ${c.diaPago || '?'}${c.tipo === 'ingreso' && c.destino ? ' · a ' + c.destino : ''}`
           : CM.esDeuda(c) ? `${c.cuota ? `Cuota ${dinero(c.cuota, c.moneda)}` : 'Pago: todo lo consumido'}${c.diaPago ? ` · día ${c.diaPago}` : ''}` : (c.fechaSaldo ? `Saldo actualizado: ${fmtFecha(c.fechaSaldo).toLowerCase()}` : '');
         return `<div class="cta-fila">
-          <button class="cta-info" data-cuenta="${esc(c.id)}"><span>${CM.TIPOS_CUENTA[c.tipo].icono} <b>${esc(c.nombre)}</b></span><small>${esc(detalle)}</small></button>
+          <button class="cta-info" data-cuenta="${esc(c.id)}"><span>${CM.TIPOS_CUENTA[c.tipo].icono} <b>${esc(c.nombre)}</b>${c.tipo === 'liquida' && CM.cuentaDefecto()?.id === c.id ? ' <em class="defecto" title="Se usa cuando no dices con qué pagaste">★ por defecto</em>' : ''}</span><small>${esc(detalle)}</small></button>
           ${s !== null ? `<b class="${c.tipo === 'liquida' ? (s < 0 ? 'rojo' : '') : 'deuda'}">${dinero(s, c.moneda || 'PEN')}</b>` : ''}
           ${c.tipo !== 'fijo' && c.tipo !== 'ingreso' ? `<button class="mini" data-saldo="${esc(c.id)}" title="Actualizar saldo">Actualizar</button>` : ''}
         </div>`;
@@ -566,6 +598,7 @@ export function vistaCaja() {
     <input type="text" id="cap-caja" placeholder="“almuerzo 25” · “pagué cuota hipoteca 5200 desde BCP” · “sueldo 8500 ingreso”" inputmode="text" enterkeyhint="done" aria-label="Registrar movimiento">
     <button class="icon-btn" data-mic-caja title="Dictar">${ic('mic')}</button>
   </div>
+  ${configurado && CM.sinCuenta().length ? `<div class="aviso aviso-sincuenta">${ic('campana')}<span><b>${CM.sinCuenta().length} movimiento${CM.sinCuenta().length > 1 ? 's' : ''} sin cuenta</b> no se ${CM.sinCuenta().length > 1 ? 'están' : 'está'} restando de tu efectivo. Indica con qué cuenta los hiciste.</span><button class="btn btn-mini btn-pri" data-asignar>Asignar cuenta</button></div>` : ''}
   ${bloqueCompromisos}
   <div class="mes-nav">
     <button class="icon-btn" data-mes="-1" aria-label="Mes anterior">${ic('atras')}</button>
@@ -618,6 +651,7 @@ export function vistaCaja() {
       el.querySelectorAll('[data-saldo]').forEach((b) => b.onclick = () => editarCuenta(b.dataset.saldo, { soloSaldo: true }));
       el.querySelectorAll('[data-nueva-cuenta]').forEach((b) => b.onclick = () => editarCuenta(null, { tipo: b.dataset.nuevaCuenta, banco: b.dataset.banco || '' }));
       el.querySelector('[data-agregar-banco]')?.addEventListener('click', agregarBanco);
+      el.querySelector('[data-asignar]')?.addEventListener('click', asignarCuenta);
       const cobros = configurado ? CM.porCobrar(H.slice(0, 7), tc) : [];
       el.querySelectorAll('[data-cobrar]').forEach((b) => b.onclick = () => cobrarIngreso(cobros[Number(b.dataset.cobrar)]));
       el.querySelectorAll('[data-mes]').forEach((b) => b.onclick = () => {

@@ -121,6 +121,17 @@ export function parsearMovimiento(texto, ctx = {}) {
     const x = menciones.find((y) => y.c.tipo === 'liquida' || (r.tipo === 'gasto' && y.c.tipo === 'tarjeta'));
     if (x) { r.cuenta = x.c.nombre; quitar(x.m); }
   }
+  // Por una palabra del nombre: "con ahorros", "de mi cuenta de ahorros" → "Ahorros BCP"
+  if (!r.cuenta && (r.tipo === 'gasto' || r.tipo === 'ingreso')) {
+    const GENERICAS = new Set(['cuenta', 'cuentas', 'tarjeta', 'credito', 'banco', 'caja', 'del', 'de', 'la', 'mi', 'mis', 'soles', 'dolares']);
+    const raiz = (w) => w.replace(/(es|s)$/, '');
+    const candidatas = detalle.filter((c) => c.tipo === 'liquida' || (r.tipo === 'gasto' && c.tipo === 'tarjeta'));
+    for (const c of candidatas) {
+      const palabras = normMismaLongitud(c.nombre).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !GENERICAS.has(w));
+      const hit = palabras.map((w) => new RegExp(`\\s(?:con|de|desde|en|a|al|por|para)\\s+(?:la\\s+|el\\s+|mi\\s+)?(?:cuenta\\s+(?:de\\s+)?)?(${raiz(w)}(?:es|s)?)\\b`).exec(n)).find(Boolean);
+      if (hit) { r.cuenta = c.nombre; quitar(hit); break; }
+    }
+  }
   const cuentas = ctx.cuentas || detalle.map((c) => c.nombre);
   const medios = [
     [/\s(?:con|por|via|desde|en)?\s*(yape|plin)\b/, 'Yape / Plin'],

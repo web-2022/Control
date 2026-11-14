@@ -62,6 +62,10 @@ const casos3 = [
   ['pagué la cuota de la hipoteca 5200 desde BCP', { tipo: 'pago', destino: 'Hipoteca', cuenta: 'Ahorros BCP' }],
   ['transferí 1000 de interbank al BCP', { tipo: 'transferencia', cuenta: 'Sueldo Interbank', destino: 'Ahorros BCP' }],
   ['cachuelo 800 ingreso', { tipo: 'ingreso', categoria: 'Trabajos extra' }],
+  ['almuerzo 30 con cuenta ahorros', { tipo: 'gasto', cuenta: 'Ahorros BCP', descripcion: 'Almuerzo' }],
+  ['taxi 20 con ahorros', { cuenta: 'Ahorros BCP', categoria: 'Transporte' }],
+  ['menú 15 de mi cuenta de ahorros', { cuenta: 'Ahorros BCP' }],
+  ['clases 600 a sueldo ingreso', { tipo: 'ingreso', cuenta: 'Sueldo Interbank' }],
 ];
 for (const [f, e] of casos3) {
   const r = parsearMovimiento(f, ctx3);
