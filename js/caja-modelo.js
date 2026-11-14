@@ -148,8 +148,9 @@ export function compromisos(mes = hoy().slice(0, 7), tc = 0) {
     const pagado = pagos.reduce((a, m) => a + conv(Number(m.monto) || 0, m.moneda, c.moneda, tc), 0);
     const pendiente = Math.max(0, Math.round((monto - pagado) * 100) / 100);
     const fecha = fechaEnMes(mes, c.diaPago);
-    const estado = pendiente <= 0.009 ? 'pagado' : fecha < H ? 'vencido' : 'pendiente';
-    return { c, fecha, monto, pagado, pendiente, estado, moneda: c.moneda || 'PEN' };
+    const marcado = (c.pagadoMes || '').split(',').includes(mes); // "ya lo pagué" sin registrar movimiento
+    const estado = marcado || pendiente <= 0.009 ? 'pagado' : fecha < H ? 'vencido' : 'pendiente';
+    return { c, fecha, monto, pagado, pendiente: marcado ? 0 : pendiente, estado, marcado, moneda: c.moneda || 'PEN' };
   }).filter(Boolean).sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
 
@@ -184,6 +185,13 @@ export function libreParaGastar(tc = 0) {
     totalPEN: r2(ef.totalPEN - pend.totalPEN), faltaTC: ef.faltaTC || pend.faltaTC,
     comprometido: pend,
   };
+}
+
+/** Marca (o desmarca) un compromiso como pagado en el mes, sin mover plata. */
+export function marcarPagado(c, mes, si = true) {
+  const l = new Set((c.pagadoMes || '').split(',').filter(Boolean));
+  if (si) l.add(mes); else l.delete(mes);
+  return store.guardar('cuentas', { id: c.id, pagadoMes: [...l].sort().slice(-12).join(',') });
 }
 
 /** Registra un nuevo saldo (de una cuenta o deuda) a partir de hoy. */

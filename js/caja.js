@@ -329,6 +329,21 @@ function agregarBanco() {
   }, { ancho: 'ancho' });
 }
 
+/** "Ya lo pagué": pagado antes de registrar saldos, o registrar el pago ahora. */
+function yaPagado(x) {
+  const c = x.c, mes = x.fecha.slice(0, 7);
+  modal(`${c.nombre} · ya pagado`, `<div class="form">
+    <p class="nota">¿Cómo lo pagaste?</p>
+    <button class="opcion-grande" data-op="marcar"><b>Lo pagué antes de registrar mis saldos</b><small>Solo se marca como pagado este mes. No se resta de tus cuentas ni de la deuda (los saldos que pusiste ya lo incluyen).</small></button>
+    <button class="opcion-grande" data-op="registrar"><b>Lo pagué después y quiero registrarlo</b><small>Se resta de la cuenta desde donde pagaste${CM.esDeuda(c) ? ' y baja la deuda' : ''}.</small></button>
+    ${CM.esDeuda(c) ? `<button class="opcion-grande" data-op="saldo"><b>Corregir lo que debo hoy</b><small>Pon el saldo real de ${esc(c.nombre)} según tu banco (por ejemplo 0 si ya no debes nada).</small></button>` : ''}
+  </div>`, (el, cerrar) => {
+    el.querySelector('[data-op="marcar"]').onclick = async () => { await CM.marcarPagado(c, mes, true); toast(`${c.nombre}: marcado como pagado este mes`); cerrar(); };
+    el.querySelector('[data-op="registrar"]').onclick = () => { cerrar(); pagarCompromiso(x); };
+    el.querySelector('[data-op="saldo"]')?.addEventListener('click', () => { cerrar(); editarCuenta(c.id, { soloSaldo: true }); });
+  });
+}
+
 /** Botón "Cobrado" de un ingreso esperado. */
 function cobrarIngreso(x) {
   const c = x.c;
@@ -421,12 +436,13 @@ export function vistaCaja() {
     <section class="seccion"><h3 class="seccion-tit">${ic('calendario')}Compromisos de ${esc(MESES[Number(H.slice(5, 7)) - 1])}<span class="contador">${pendientes.length} por pagar</span></h3>
       <div class="lista">${comp.map((x, i) => {
         const dias = diffDias(x.fecha, H);
-        const etiqueta = x.estado === 'pagado' ? '✓ Pagado' : x.estado === 'vencido' ? `Venció ${fmtFecha(x.fecha)}` : dias === 0 ? 'Vence hoy' : dias <= 3 ? `Vence en ${dias} día${dias > 1 ? 's' : ''}` : `Vence el ${Number(x.fecha.slice(8))}`;
+        const etiqueta = x.estado === 'pagado' ? (x.marcado ? '✓ Pagado (marcado por ti)' : '✓ Pagado') : x.estado === 'vencido' ? `Venció ${fmtFecha(x.fecha)}` : dias === 0 ? 'Vence hoy' : dias <= 3 ? `Vence en ${dias} día${dias > 1 ? 's' : ''}` : `Vence el ${Number(x.fecha.slice(8))}`;
         return `<div class="comp comp-${x.estado} ${x.estado === 'pendiente' && dias <= 3 ? 'comp-pronto' : ''}">
           <span class="mov-ic">${CM.TIPOS_CUENTA[x.c.tipo].icono}</span>
           <span class="mov-txt"><b>${esc(x.c.nombre)}</b><small>${esc(etiqueta)}${x.pagado && x.estado !== 'pagado' ? ` · pagado ${dinero(x.pagado, x.moneda)}` : ''}</small></span>
           <span class="mov-monto">${dinero(x.estado === 'pagado' ? x.monto : x.pendiente, x.moneda)}</span>
-          ${x.estado === 'pagado' ? '<span class="comp-ok">✓</span>' : `<button class="btn btn-mini btn-pri" data-pagar="${i}">Pagar</button>`}
+          ${x.estado === 'pagado' ? (x.marcado ? `<button class="mini" data-desmarcar="${i}" title="Volver a pendiente">Deshacer</button>` : '<span class="comp-ok">✓</span>')
+            : `<span class="comp-btns"><button class="mini" data-yapague="${i}">Ya lo pagué</button><button class="btn btn-mini btn-pri" data-pagar="${i}">Pagar</button></span>`}
         </div>`;
       }).join('')}</div>
     </section>` : '';
@@ -596,6 +612,8 @@ export function vistaCaja() {
       el.querySelectorAll('[data-nuevo]').forEach((b) => b.onclick = () => editarMovimiento(null, { tipo: b.dataset.nuevo }));
       el.querySelector('[data-configurar]')?.addEventListener('click', configurarInicial);
       el.querySelectorAll('[data-pagar]').forEach((b) => b.onclick = () => pagarCompromiso(comp[Number(b.dataset.pagar)]));
+      el.querySelectorAll('[data-yapague]').forEach((b) => b.onclick = () => yaPagado(comp[Number(b.dataset.yapague)]));
+      el.querySelectorAll('[data-desmarcar]').forEach((b) => b.onclick = async () => { const x = comp[Number(b.dataset.desmarcar)]; await CM.marcarPagado(x.c, x.fecha.slice(0, 7), false); toast(`${x.c.nombre}: vuelve a pendiente`); });
       el.querySelectorAll('[data-cuenta]').forEach((b) => b.onclick = () => editarCuenta(b.dataset.cuenta));
       el.querySelectorAll('[data-saldo]').forEach((b) => b.onclick = () => editarCuenta(b.dataset.saldo, { soloSaldo: true }));
       el.querySelectorAll('[data-nueva-cuenta]').forEach((b) => b.onclick = () => editarCuenta(null, { tipo: b.dataset.nuevaCuenta, banco: b.dataset.banco || '' }));

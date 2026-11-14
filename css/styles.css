@@ -718,3 +718,8 @@ body.modo-limpio .vista { margin: 0 auto; padding: 0 20px 60px; max-width: 1040p
 .conf-fila-banco input { font-weight: 650; }
 .conf-et { color: var(--tenue); font-size: 12px; margin-top: 2px; }
 .conf-fila-igual { grid-template-columns: 1fr 1fr .8fr; }
+.comp-btns { display: flex; gap: 6px; align-items: center; }
+.opcion-grande { display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%; padding: 12px 14px; border: 1px solid var(--borde); border-radius: var(--radio); background: var(--sup); color: var(--txt); font: inherit; cursor: pointer; }
+.opcion-grande:hover { border-color: var(--acento); }
+.opcion-grande small { color: var(--tenue); font-size: 12.5px; }
+@media (max-width: 520px) { .comp { flex-wrap: wrap; } .comp-btns { width: 100%; justify-content: flex-end; } }

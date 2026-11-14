@@ -39,7 +39,7 @@ var COLUMNAS_BASE = {
   proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_srv'],
   diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_srv'],
   movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'destino', 'nota', 'creado', 'deleted', 'updatedAt', '_srv'],
-  cuentas: ['id', 'nombre', 'tipo', 'banco', 'moneda', 'saldoInicial', 'fechaSaldo', 'saldoEn', 'cuota', 'diaPago', 'categoria', 'destino', 'nota', 'orden', 'activo', 'creado', 'deleted', 'updatedAt', '_srv']
+  cuentas: ['id', 'nombre', 'tipo', 'banco', 'moneda', 'saldoInicial', 'fechaSaldo', 'saldoEn', 'cuota', 'diaPago', 'categoria', 'destino', 'pagadoMes', 'nota', 'orden', 'activo', 'creado', 'deleted', 'updatedAt', '_srv']
 };
 
 // ------------------------------------------------------------

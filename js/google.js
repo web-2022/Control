@@ -28,7 +28,7 @@ export const COLUMNAS = {
   proyectos: ['id', 'nombre', 'codigo', 'cliente', 'fase', 'color', 'avance', 'disciplinas', 'hitos', 'descripcion', 'activo', 'creado', 'deleted', 'updatedAt', '_extra'],
   diario: ['id', 'fecha', 'comentario', 'hechos', 'avances', 'movidos', 'quedaron', 'pendientesAbiertos', 'cerradoA', 'creado', 'deleted', 'updatedAt', '_extra'],
   movimientos: ['id', 'fecha', 'tipo', 'monto', 'moneda', 'categoria', 'descripcion', 'cuenta', 'destino', 'nota', 'creado', 'deleted', 'updatedAt', '_extra'],
-  cuentas: ['id', 'nombre', 'tipo', 'banco', 'moneda', 'saldoInicial', 'fechaSaldo', 'saldoEn', 'cuota', 'diaPago', 'categoria', 'destino', 'nota', 'orden', 'activo', 'creado', 'deleted', 'updatedAt', '_extra'],
+  cuentas: ['id', 'nombre', 'tipo', 'banco', 'moneda', 'saldoInicial', 'fechaSaldo', 'saldoEn', 'cuota', 'diaPago', 'categoria', 'destino', 'pagadoMes', 'nota', 'orden', 'activo', 'creado', 'deleted', 'updatedAt', '_extra'],
 };
 
 /** Error que indica que hay que volver a iniciar sesión (token vencido). */
