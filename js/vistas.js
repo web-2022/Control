@@ -4,6 +4,7 @@
 // Las acciones comunes (marcar hecho, abrir, posponer) se manejan
 // en app.js por delegación con atributos data-acc.
 // ============================================================
+import { VERSION_APP } from './config.js';
 import * as store from './store.js';
 import * as M from './modelo.js';
 import * as C from './componentes.js';
@@ -899,13 +900,24 @@ export function vistaAjustes() {
       </div>
       <p class="nota">Borrar no afecta tu Google Sheet. Al volver a sincronizar, se descargan los datos de la hoja.</p>
     </section>
-  </div>`;
+  </div>  <p class="nota version-app">Control versión ${VERSION_APP} · <button class="mini-link" data-forzar-act>Buscar actualización</button></p>
+`;
 
   return {
     titulo: 'Ajustes', html,
     montar(el, refrescar) {
       const $ = (s) => el.querySelector(s);
       $('[data-instalar-ajustes]')?.addEventListener('click', () => import('./instalar.js').then((m) => m.instalar()));
+      $('[data-forzar-act]')?.addEventListener('click', async () => {
+        toast('Buscando actualización…');
+        try {
+          const reg = await navigator.serviceWorker?.getRegistration();
+          await reg?.update();
+          if (reg?.installing || reg?.waiting) return; // se recargará sola
+          for (const k of await caches.keys()) await caches.delete(k);
+          location.reload();
+        } catch { location.reload(); }
+      });
       $('#aj-nombre').addEventListener('change', (e) => { store.guardarConfig({ miNombre: e.target.value.trim() }); toast('Nombre guardado'); });
       $('#aj-tema').addEventListener('change', (e) => { store.guardarConfig({ tema: e.target.value }); document.documentElement.dataset.tema = e.target.value; });
       $('#aj-voz').addEventListener('change', (e) => { localStorage.setItem('control.vozIdioma', e.target.value); toast('Idioma de dictado guardado'); });

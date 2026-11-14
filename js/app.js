@@ -213,19 +213,23 @@ async function iniciar() {
 
   // Service worker (PWA offline)
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register('sw.js').then((reg) => {
+    // Al llegar una versión nueva se recarga sola (si no estás escribiendo en un formulario)
+    let recargando = false;
+    const recargar = () => {
+      if (recargando) return;
+      if (document.querySelector('.modal, dialog[open]')) { setTimeout(recargar, 3000); return; }
+      recargando = true; location.reload();
+    };
+    if (navigator.serviceWorker.controller) navigator.serviceWorker.addEventListener('controllerchange', recargar);
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+      const revisar = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') revisar(); });
+      setInterval(revisar, 30 * 60 * 1000);
+      if (reg.waiting) reg.waiting.postMessage('activar');
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
         nw?.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-            toast('Hay una versión nueva de Control', {
-              texto: 'Actualizar',
-              fn: () => {
-                navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
-                nw.postMessage('activar');
-              },
-            }, 15000);
-          }
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) { toast('Actualizando Control…'); nw.postMessage('activar'); }
         });
       });
     }).catch((e) => console.warn('SW', e));

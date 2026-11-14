@@ -5,7 +5,7 @@
 // NO se interceptan: van siempre directo a la red.
 // Al publicar cambios, sube el número de VERSION.
 // ============================================================
-const VERSION = 'control-v1.8.2';
+const VERSION = 'control-v1.8.3';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.json', 'css/styles.css',
   'js/app.js', 'js/store.js', 'js/sync.js', 'js/parser.js', 'js/voz.js', 'js/vistas.js',
@@ -15,7 +15,10 @@ const ARCHIVOS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS)));
+  // cache: 'reload' evita guardar archivos viejos del caché HTTP del navegador
+  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(ARCHIVOS.map((u) => new Request(u, { cache: 'reload' })))));
+  self.skipWaiting(); // la versión nueva entra apenas se descarga
+
 });
 
 self.addEventListener('activate', (e) => {
@@ -41,8 +44,10 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// Activar la nueva versión cuando el usuario acepte "Actualizar"
-self.addEventListener('message', (e) => { if (e.data === 'activar') self.skipWaiting(); });
+self.addEventListener('message', (e) => {
+  if (e.data === 'activar') self.skipWaiting();
+  if (e.data === 'version') e.source?.postMessage({ version: VERSION });
+});
 
 // Al tocar una notificación, abrir la app en la vista correspondiente
 self.addEventListener('notificationclick', (e) => {

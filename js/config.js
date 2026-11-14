@@ -17,3 +17,6 @@ export const NOMBRE_HOJA = 'Control – Mis datos';
 
 // Dirección pública de la app (para el botón Compartir)
 export const URL_APP = 'https://web-2022.github.io/Control/';
+
+/** Versión publicada (igual que en sw.js). */
+export const VERSION_APP = '1.8.3';
