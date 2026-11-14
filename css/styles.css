@@ -704,3 +704,17 @@ body.modo-limpio .vista { margin: 0 auto; padding: 0 20px 60px; max-width: 1040p
   .top-card > b { font-size: 21px; }
   .top-card > small { width: 100%; }
 }
+
+/* Caja: bancos */
+.grupo-cuentas.banco { background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 10px 12px; }
+.banco-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 0 0 4px; font-size: 15px; }
+.banco-cab small { color: var(--txt2); font-weight: 500; font-size: 12.5px; }
+.banco-cab b.deuda, .cta-fila > b.deuda { color: var(--acento); }
+.banco .cta-fila:last-of-type { border-bottom: 0; }
+.banco-acc { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.conf-banco { border: 1px solid var(--borde); border-radius: var(--radio); padding: 10px; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.conf-fila-3 { grid-template-columns: 1.3fr .6fr 1fr; }
+.conf-fila-banco { grid-template-columns: 1fr auto; }
+.conf-fila-banco input { font-weight: 650; }
+.conf-et { color: var(--tenue); font-size: 12px; margin-top: 2px; }
+.conf-fila-igual { grid-template-columns: 1fr 1fr .8fr; }

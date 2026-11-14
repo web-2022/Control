@@ -6,6 +6,8 @@
 //   tarjeta  → tarjeta de crédito: lo que DEBES (sube con compras)
 //   prestamo → préstamos / hipoteca: lo que DEBES (baja con pagos)
 //   fijo     → gasto fijo mensual (alquiler, pensión, Netflix…)
+//   ingreso  → ingreso mensual esperado (sueldo, clases, alquiler que cobras…)
+// Cuentas y tarjetas pueden tener "banco" para agruparlas (BCP, Interbank…).
 //
 // Tipos de movimiento (tabla "movimientos"):
 //   ingreso, gasto           → afectan el resultado del mes
@@ -24,6 +26,7 @@ export const TIPOS_CUENTA = {
   tarjeta: { nombre: 'Tarjeta de crédito', icono: '💳', grupo: 'Mis deudas' },
   prestamo: { nombre: 'Préstamo / deuda', icono: '🏦', grupo: 'Mis deudas' },
   fijo: { nombre: 'Gasto fijo mensual', icono: '📌', grupo: 'Gastos fijos' },
+  ingreso: { nombre: 'Ingreso mensual', icono: '💰', grupo: 'Ingresos del mes' },
 };
 export const esDeuda = (c) => c && (c.tipo === 'tarjeta' || c.tipo === 'prestamo');
 
@@ -31,6 +34,32 @@ export const cuentas = () => store.todos('cuentas').filter((c) => c.activo !== f
   .sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99) || a.nombre.localeCompare(b.nombre));
 export const deTipo = (...tipos) => cuentas().filter((c) => tipos.includes(c.tipo));
 export const buscarCuenta = (nombre) => (nombre ? cuentas().find((c) => norm(c.nombre) === norm(nombre)) || null : null);
+/** Bancos registrados, en el orden de sus cuentas. */
+export const bancos = () => [...new Set(cuentas().map((c) => (c.banco || '').trim()).filter(Boolean))];
+
+/**
+ * Otras formas de nombrar una cuenta al escribir: "BCP" → la primera cuenta
+ * del BCP; "visa BCP", "tarjeta BCP" → la tarjeta del BCP.
+ */
+export function aliasCuenta(c, lista = cuentas()) {
+  const b = (c.banco || '').trim();
+  if (!b) return [];
+  const delBanco = lista.filter((x) => norm(x.banco) === norm(b));
+  if (c.tipo === 'liquida') {
+    const primera = delBanco.find((x) => x.tipo === 'liquida') === c;
+    return primera ? [b, `cuenta ${b}`, `cuenta del ${b}`, `ahorros ${b}`] : [];
+  }
+  if (c.tipo === 'tarjeta' && delBanco.find((x) => x.tipo === 'tarjeta') === c) {
+    return [`tarjeta ${b}`, `tarjeta del ${b}`, `tarjeta de credito ${b}`, `tarjeta de credito del ${b}`, `visa ${b}`, `mastercard ${b}`, `amex ${b}`, `${b} visa`, `credito ${b}`];
+  }
+  return [];
+}
+/** Datos para el intérprete de frases. */
+export function detalleParaParser() {
+  const l = cuentas();
+  return l.filter((c) => c.tipo !== 'fijo' && c.tipo !== 'ingreso').map((c) => ({ nombre: c.nombre, tipo: c.tipo, alias: aliasCuenta(c, l) }));
+}
+
 /** Nombres de cuentas para selects (incluye las antiguas guardadas solo como texto). */
 export function nombresCuentas(tipos = ['liquida', 'tarjeta']) {
   const regs = deTipo(...tipos).map((c) => c.nombre);
@@ -122,6 +151,27 @@ export function compromisos(mes = hoy().slice(0, 7), tc = 0) {
     const estado = pendiente <= 0.009 ? 'pagado' : fecha < H ? 'vencido' : 'pendiente';
     return { c, fecha, monto, pagado, pendiente, estado, moneda: c.moneda || 'PEN' };
   }).filter(Boolean).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+/**
+ * Ingresos esperados del mes (tipo "ingreso"): sueldo, clases, alquileres…
+ * Cobrado si hay un ingreso del mes con su fijoId o cuya descripción lo nombra.
+ */
+export function porCobrar(mes = hoy().slice(0, 7), tc = 0) {
+  const movsMes = movimientos().filter((m) => (m.fecha || '').slice(0, 7) === mes && m.tipo === 'ingreso');
+  return deTipo('ingreso').map((c) => {
+    const monto = Number(c.cuota) || 0;
+    if (!monto) return null;
+    const n = norm(c.nombre);
+    const cobrado = movsMes.filter((m) => m.fijoId === c.id || norm(m.descripcion).includes(n))
+      .reduce((a, m) => a + conv(Number(m.monto) || 0, m.moneda, c.moneda || 'PEN', tc), 0);
+    const pendiente = Math.max(0, Math.round((monto - cobrado) * 100) / 100);
+    const fecha = fechaEnMes(mes, c.diaPago);
+    return { c, fecha, monto, cobrado, pendiente, estado: pendiente <= 0.009 ? 'cobrado' : 'pendiente', moneda: c.moneda || 'PEN' };
+  }).filter(Boolean).sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+export function totalPorCobrar(tc = 0) {
+  return totalizar(porCobrar(hoy().slice(0, 7), tc).filter((x) => x.estado !== 'cobrado').map((x) => ({ monto: x.pendiente, moneda: x.moneda })), tc);
 }
 
 /** Libre para gastar = efectivo disponible − lo comprometido que falta pagar este mes. */

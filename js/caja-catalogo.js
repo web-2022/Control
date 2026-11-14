@@ -35,8 +35,15 @@ export const CATEGORIAS_INGRESO = [
   { nombre: 'Alquileres', icono: '🔑', claves: ['alquiler', 'renta', 'inquilino'] },
   { nombre: 'Inversiones', icono: '📈', claves: ['dividendo', 'interes', 'plazo fijo', 'fondo mutuo', 'acciones', 'inversion'] },
   { nombre: 'Reembolsos', icono: '↩️', claves: ['reembolso', 'devolucion', 'viaticos'] },
+  { nombre: 'Trabajos extra', icono: '🛠️', claves: ['cachuelo', 'extra', 'freelance', 'encargo', 'trabajo extra'] },
+  { nombre: 'Comisiones', icono: '🤝', claves: ['comision', 'comisiones', 'referido'] },
+  { nombre: 'Apoyo familiar', icono: '👨‍👩‍👦', claves: ['apoyo', 'me dieron', 'me regalaron', 'regalo recibido', 'herencia'] },
+  { nombre: 'Pensión / jubilación', icono: '🧓', claves: ['jubilacion', 'onp', 'afp', 'pension de jubilacion'] },
   { nombre: 'Otros ingresos', icono: '💰', claves: [] },
 ];
+
+/** Bancos y cajas usuales en Perú (se puede escribir cualquier otro). */
+export const BANCOS = ['BCP', 'Interbank', 'BBVA', 'Scotiabank', 'BanBif', 'Banco Pichincha', 'Banco de la Nación', 'Mibanco', 'Banco Falabella', 'Banco Ripley', 'Caja Arequipa', 'Caja Huancayo', 'Caja Piura', 'Caja Cusco', 'Caja Trujillo', 'Banco GNB', 'Citibank'];
 
 export const CUENTAS_DEFECTO = ['Efectivo', 'Cuenta sueldo', 'Tarjeta de crédito', 'Yape / Plin'];
 

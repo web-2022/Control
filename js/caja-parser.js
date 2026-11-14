@@ -79,12 +79,12 @@ export function parsearMovimiento(texto, ctx = {}) {
   // ---- Pago de deuda y transferencia entre cuentas ----
   const detalle = ctx.detalle || [];
   const esDeudaT = (t) => t === 'tarjeta' || t === 'prestamo';
-  const menciones = detalle.map((c) => {
-    const k = normMismaLongitud(c.nombre).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const menciones = detalle.flatMap((c) => [c.nombre, ...(c.alias || [])].map((txt) => {
+    const k = normMismaLongitud(txt).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
     const m = new RegExp(`(?:^|\\s)(?:(desde|de|del|con|en|a|al|hacia|para)\\s+(?:la\\s+|el\\s+|mi\\s+)?)?(${k})\\b`).exec(n);
-    return m ? { c, m, pos: m.index, fin: m.index + m[0].length } : null;
-  }).filter(Boolean)
-    .sort((a, b) => b.c.nombre.length - a.c.nombre.length)
+    return m ? { c, m, pos: m.index, fin: m.index + m[0].length, largo: txt.length } : null;
+  })).filter(Boolean)
+    .sort((a, b) => b.largo - a.largo)
     .filter((x, i, arr) => !arr.slice(0, i).some((y) => x.pos < y.fin && y.pos < x.fin)) // "BCP" dentro de "Visa BCP" no cuenta
     .sort((a, b) => a.pos - b.pos);
   const verboPago = /\b(pague|pago|abone|abono|amortice|cancele)\b/.test(n);
@@ -116,7 +116,11 @@ export function parsearMovimiento(texto, ctx = {}) {
     }
   }
 
-  // Cuenta / medio de pago
+  // Cuenta / medio de pago: primero las cuentas registradas (y sus alias por banco)
+  if (!r.cuenta && (r.tipo === 'gasto' || r.tipo === 'ingreso')) {
+    const x = menciones.find((y) => y.c.tipo === 'liquida' || (r.tipo === 'gasto' && y.c.tipo === 'tarjeta'));
+    if (x) { r.cuenta = x.c.nombre; quitar(x.m); }
+  }
   const cuentas = ctx.cuentas || detalle.map((c) => c.nombre);
   const medios = [
     [/\s(?:con|por|via|desde|en)?\s*(yape|plin)\b/, 'Yape / Plin'],

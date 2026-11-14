@@ -46,8 +46,31 @@ for (const [f, e] of casos2) {
   if (mal.length) { console.log(`✗ "${f}"`); mal.forEach(([k, v]) => console.log(`    ${k}: esperado ${JSON.stringify(v)}, obtenido ${JSON.stringify(r[k])}`)); }
   else { ok++; console.log(`✓ "${f}" → ${r.tipo} ${r.monto} ${r.cuenta}→${r.destino} · ${r.descripcion}`); }
 }
+// Varios bancos: cuentas y tarjetas agrupadas por banco
+const ctx3 = { now: new Date(2026, 10, 13, 12, 0), detalle: [
+  { nombre: 'Efectivo', tipo: 'liquida' },
+  { nombre: 'Ahorros BCP', tipo: 'liquida', alias: ['BCP', 'cuenta BCP', 'ahorros BCP'] },
+  { nombre: 'Sueldo Interbank', tipo: 'liquida', alias: ['Interbank', 'cuenta Interbank'] },
+  { nombre: 'Visa BCP', tipo: 'tarjeta', alias: ['tarjeta BCP', 'visa BCP', 'credito BCP'] },
+  { nombre: 'Tarjeta Interbank', tipo: 'tarjeta', alias: ['tarjeta Interbank', 'visa Interbank', 'credito Interbank'] },
+  { nombre: 'Hipoteca', tipo: 'prestamo' }] };
+const casos3 = [
+  ['almuerzo 40 con tarjeta interbank', { tipo: 'gasto', cuenta: 'Tarjeta Interbank', categoria: 'Alimentación', descripcion: 'Almuerzo' }],
+  ['gasolina 150 con BCP', { tipo: 'gasto', cuenta: 'Ahorros BCP' }],
+  ['honorarios 3000 a interbank ingreso', { tipo: 'ingreso', cuenta: 'Sueldo Interbank', categoria: 'Consultoría / honorarios' }],
+  ['pagué la tarjeta BCP 1500 desde interbank', { tipo: 'pago', destino: 'Visa BCP', cuenta: 'Sueldo Interbank' }],
+  ['pagué la cuota de la hipoteca 5200 desde BCP', { tipo: 'pago', destino: 'Hipoteca', cuenta: 'Ahorros BCP' }],
+  ['transferí 1000 de interbank al BCP', { tipo: 'transferencia', cuenta: 'Sueldo Interbank', destino: 'Ahorros BCP' }],
+  ['cachuelo 800 ingreso', { tipo: 'ingreso', categoria: 'Trabajos extra' }],
+];
+for (const [f, e] of casos3) {
+  const r = parsearMovimiento(f, ctx3);
+  const mal = Object.entries(e).filter(([k, v]) => r[k] !== v);
+  if (mal.length) { console.log(`✗ "${f}"`); mal.forEach(([k, v]) => console.log(`    ${k}: esperado ${JSON.stringify(v)}, obtenido ${JSON.stringify(r[k])}`)); }
+  else { ok++; console.log(`✓ "${f}" → ${r.tipo} ${r.monto} ${r.cuenta}→${r.destino} · ${r.categoria}`); }
+}
 const nums = [['1,234.50', 1234.5], ['1.234,50', 1234.5], ['45,5', 45.5], ['1,500', 1500], ['1.500', 1500], ['18.50', 18.5], ['8,500', 8500]];
 for (const [t, v] of nums) { if (aNumero(t) === v) ok++; else console.log(`✗ aNumero(${t}) = ${aNumero(t)} (esperado ${v})`); }
-const total = casos.length + casos2.length + nums.length;
+const total = casos.length + casos2.length + casos3.length + nums.length;
 console.log(`\n${ok}/${total} pruebas correctas`);
 if (ok !== total) process.exit(1);

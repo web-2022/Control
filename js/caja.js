@@ -12,7 +12,7 @@
 // ============================================================
 import * as store from './store.js';
 import { parsearMovimiento } from './caja-parser.js';
-import { CATEGORIAS_GASTO, CATEGORIAS_INGRESO, CUENTAS_DEFECTO, MONEDAS, iconoCategoria } from './caja-catalogo.js';
+import { CATEGORIAS_GASTO, CATEGORIAS_INGRESO, CUENTAS_DEFECTO, MONEDAS, BANCOS, iconoCategoria } from './caja-catalogo.js';
 import * as CM from './caja-modelo.js';
 import { modal, toast, confirmar, leerForm, descargar } from './ui.js';
 import { ic } from './iconos.js';
@@ -56,7 +56,7 @@ function totalHTML(t, tc, conTotal = true) {
 
 // ---------------- Guardar desde texto ----------------
 export async function crearMovimientoDesdeTexto(texto) {
-  const detalle = CM.cuentas().map((c) => ({ nombre: c.nombre, tipo: c.tipo }));
+  const detalle = CM.detalleParaParser();
   const r = parsearMovimiento(texto, { detalle, cuentas: detalle.length ? undefined : CUENTAS_DEFECTO });
   if (r.monto === null) {
     toast('No encontré el monto. Ejemplo: “almuerzo 25” o “netflix 15 dólares”.', null, 6000);
@@ -68,7 +68,10 @@ export async function crearMovimientoDesdeTexto(texto) {
     editarMovimiento(null, { ...r, textoOriginal: texto.trim() });
     return null;
   }
-  const m = await store.guardar('movimientos', { ...r, textoOriginal: texto.trim() });
+  // ¿Es uno de tus ingresos mensuales (sueldo, clases…)? Se marca como cobrado.
+  const fijo = r.tipo === 'ingreso' ? CM.deTipo('ingreso').find((c) => norm(texto).includes(norm(c.nombre))) : null;
+  if (fijo && !r.cuenta && fijo.destino) r.cuenta = fijo.destino;
+  const m = await store.guardar('movimientos', { ...r, ...(fijo ? { fijoId: fijo.id } : {}), textoOriginal: texto.trim() });
   const signo = m.tipo === 'ingreso' ? '＋' : m.tipo === 'transferencia' ? '⇄' : '−';
   const etiqueta = m.tipo === 'pago' ? `Pago a ${m.destino}` : m.tipo === 'transferencia' ? `${m.cuenta} → ${m.destino}` : m.categoria;
   const acciones = [{ texto: 'Editar', fn: () => editarMovimiento(m.id) }];
@@ -171,31 +174,35 @@ export function editarMovimiento(id, defecto = {}) {
 
 // ---------------- Cuentas, deudas y gastos fijos ----------------
 export function editarCuenta(id, op = {}) {
-  const c = id ? store.obtener('cuentas', id) : { tipo: op.tipo || 'liquida', moneda: 'PEN', activo: true };
+  const c = id ? store.obtener('cuentas', id) : { tipo: op.tipo || 'liquida', moneda: 'PEN', activo: true, banco: op.banco || '' };
   if (!c) return;
   const t = c.tipo;
   const saldoActual = id ? CM.saldo(c, cfgCaja().tc) : '';
-  const etiquetaSaldo = { liquida: '¿Cuánto tienes hoy en esta cuenta?', tarjeta: '¿Cuánto debes hoy en la tarjeta?', prestamo: '¿Cuánto debes hoy? (saldo según tu banco)', fijo: '' }[t];
+  const etiquetaSaldo = { liquida: '¿Cuánto tienes hoy en esta cuenta?', tarjeta: '¿Cuánto debes hoy en la tarjeta?', prestamo: '¿Cuánto debes hoy? (saldo según tu banco)', fijo: '', ingreso: '' }[t];
+  const sinSaldo = t === 'fijo' || t === 'ingreso';
+  const conBanco = t === 'liquida' || t === 'tarjeta' || t === 'prestamo';
   const html = `
   <form class="form">
     ${op.soloSaldo ? `<p class="nota">${t === 'liquida' ? 'Pon el saldo real que tienes hoy. Desde ahora, tus gastos e ingresos lo irán actualizando.' : 'Pon el saldo que te indica tu banco después del último pago. Desde ahora se contará desde este monto.'}</p>` : ''}
     <div class="fila-campos" ${op.soloSaldo ? 'hidden' : ''}>
-      <label class="campo"><span>${t === 'fijo' ? 'Nombre del gasto fijo' : 'Nombre'}</span><input name="nombre" required value="${esc(c.nombre || '')}" placeholder="${{ liquida: 'Ej.: BCP, Interbank, Efectivo', tarjeta: 'Ej.: Visa BCP', prestamo: 'Ej.: Hipoteca, Préstamo vehicular', fijo: 'Ej.: Alquiler, Pensión colegio' }[t]}" ${op.soloSaldo ? '' : 'autofocus'}></label>
+      <label class="campo"><span>${t === 'fijo' ? 'Nombre del gasto fijo' : t === 'ingreso' ? 'Nombre del ingreso' : 'Nombre'}</span><input name="nombre" required value="${esc(c.nombre || (op.banco ? `${t === 'tarjeta' ? 'Tarjeta' : t === 'prestamo' ? 'Préstamo' : 'Ahorros'} ${op.banco}` : ''))}" placeholder="${{ liquida: 'Ej.: Ahorros BCP, Sueldo Interbank, Efectivo', tarjeta: 'Ej.: Visa BCP', prestamo: 'Ej.: Hipoteca, Préstamo vehicular', fijo: 'Ej.: Alquiler, Pensión colegio', ingreso: 'Ej.: Sueldo, Clases, Alquiler del depa' }[t]}" ${op.soloSaldo ? '' : 'autofocus'}></label>
       <label class="campo campo-corto"><span>Moneda</span><select name="moneda">${Object.entries(MONEDAS).map(([k, v]) => `<option value="${k}" ${c.moneda === k ? 'selected' : ''}>${v.simbolo}</option>`).join('')}</select></label>
     </div>
-    ${t !== 'fijo' ? `<label class="campo campo-full"><span>${etiquetaSaldo}</span><input name="saldo" type="number" inputmode="decimal" step="0.01" value="${saldoActual === '' ? '' : esc(saldoActual)}" ${op.soloSaldo ? 'autofocus' : ''} required></label>` : ''}
+    ${conBanco && !op.soloSaldo ? `<label class="campo campo-full"><span>Banco o caja (opcional)</span><input name="banco" list="lista-bancos" value="${esc(c.banco || '')}" placeholder="Ej.: BCP, Interbank, BBVA" autocomplete="off"><datalist id="lista-bancos">${[...new Set([...CM.bancos(), ...BANCOS])].map((b) => `<option value="${esc(b)}">`).join('')}</datalist></label>` : ''}
+    ${!sinSaldo ? `<label class="campo campo-full"><span>${etiquetaSaldo}</span><input name="saldo" type="number" inputmode="decimal" step="0.01" value="${saldoActual === '' ? '' : esc(saldoActual)}" ${op.soloSaldo ? 'autofocus' : ''} required></label>` : ''}
     ${t !== 'liquida' && !op.soloSaldo ? `<div class="fila-campos">
-      <label class="campo"><span>${t === 'fijo' ? 'Monto mensual' : t === 'tarjeta' ? 'Pago del mes (opcional)' : 'Cuota mensual'}</span><input name="cuota" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(c.cuota ?? '')}" ${t === 'tarjeta' ? 'placeholder="Vacío = todo lo consumido"' : 'required'}></label>
-      <label class="campo campo-corto"><span>Día de pago</span><input name="diaPago" type="number" min="1" max="31" value="${esc(c.diaPago ?? '')}" required></label>
+      <label class="campo"><span>${t === 'fijo' || t === 'ingreso' ? 'Monto mensual' : t === 'tarjeta' ? 'Pago del mes (opcional)' : 'Cuota mensual'}</span><input name="cuota" type="number" inputmode="decimal" step="0.01" min="0" value="${esc(c.cuota ?? '')}" ${t === 'tarjeta' ? 'placeholder="Vacío = todo lo consumido"' : 'required'}></label>
+      <label class="campo campo-corto"><span>${t === 'ingreso' ? 'Día que cobras' : 'Día de pago'}</span><input name="diaPago" type="number" min="1" max="31" value="${esc(c.diaPago ?? '')}" required></label>
     </div>` : ''}
-    ${t === 'fijo' && !op.soloSaldo ? `<label class="campo campo-full"><span>Categoría</span><select name="categoria">${CATEGORIAS_GASTO.map((x) => `<option ${x.nombre === c.categoria ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>` : ''}
+    ${(t === 'fijo' || t === 'ingreso') && !op.soloSaldo ? `<label class="campo campo-full"><span>Categoría</span><select name="categoria">${(t === 'ingreso' ? CATEGORIAS_INGRESO : CATEGORIAS_GASTO).map((x) => `<option ${x.nombre === c.categoria ? 'selected' : ''}>${esc(x.nombre)}</option>`).join('')}</select></label>` : ''}
+    ${t === 'ingreso' && !op.soloSaldo ? `<label class="campo campo-full"><span>¿A qué cuenta te llega?</span><select name="destino"><option value="">— Sin especificar —</option>${CM.nombresCuentas(['liquida']).map((n) => `<option ${n === c.destino ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
     ${op.soloSaldo ? '' : `<label class="campo campo-full"><span>Nota</span><input name="nota" value="${esc(c.nota || '')}" placeholder="${t === 'prestamo' ? 'Ej.: Banco, tasa, plazo, fecha final' : ''}"></label>`}
     <div class="acciones-modal">
       ${id && !op.soloSaldo ? `<button type="button" class="btn btn-peligro-txt" data-borrar>${ic('basura')} Eliminar</button>` : ''}
       <span class="sep"></span><button class="btn btn-pri">Guardar</button>
     </div>
   </form>`;
-  const tituloT = { liquida: 'cuenta', tarjeta: 'tarjeta de crédito', prestamo: 'deuda / préstamo', fijo: 'gasto fijo' }[t];
+  const tituloT = { liquida: 'cuenta', tarjeta: 'tarjeta de crédito', prestamo: 'deuda / préstamo', fijo: 'gasto fijo', ingreso: 'ingreso mensual' }[t];
   modal(op.soloSaldo ? `Actualizar saldo · ${c.nombre}` : `${id ? 'Editar' : 'Nueva'} ${tituloT}`, html, (el, cerrar) => {
     el.querySelector('form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -212,7 +219,10 @@ export function editarCuenta(id, op = {}) {
           if (norm(m.destino) === norm(previo.nombre)) cambios.destino = d.nombre;
           if (Object.keys(cambios).length) await store.guardar('movimientos', { id: m.id, ...cambios });
         }
+        for (const x of CM.cuentas()) if (norm(x.destino) === norm(previo.nombre)) await store.guardar('cuentas', { id: x.id, destino: d.nombre });
       }
+      if (d.banco !== undefined) d.banco = d.banco.trim();
+      if (!id && CM.buscarCuenta(d.nombre)) { toast(`Ya tienes una cuenta llamada “${d.nombre}”. Usa otro nombre.`); return; }
       const g = await store.guardar('cuentas', { ...(id ? { id } : { tipo: t, activo: true, orden: CM.cuentas().length }), ...d });
       if (saldo !== undefined && saldo !== '' && (!id || Number(saldo) !== saldoActual)) await CM.fijarSaldo(g, Number(saldo));
       toast('Guardado');
@@ -224,36 +234,105 @@ export function editarCuenta(id, op = {}) {
   });
 }
 
-/** Configuración inicial: saldos de hoy y deudas, en un solo paso. */
+/** Bloque de formulario para un banco: cuenta(s) de ahorro y tarjeta. */
+function bloqueBanco(i, banco = '') {
+  const opts = [...new Set([...CM.bancos(), ...BANCOS])].map((b) => `<option value="${esc(b)}">`).join('');
+  return `<fieldset class="conf-banco" data-i="${i}">
+    <div class="conf-fila conf-fila-banco"><input name="b${i}" list="bancos-${i}" value="${esc(banco)}" placeholder="🏛️ Banco (ej.: BCP)" autocomplete="off"><datalist id="bancos-${i}">${opts}</datalist>
+      ${i > 0 ? '<button type="button" class="mini" data-quitar-banco>Quitar</button>' : '<span></span>'}</div>
+    <small class="conf-et">Cuenta de ahorros / sueldo</small>
+    <div class="conf-fila conf-fila-3"><input name="b${i}_cn" placeholder="Nombre (ej.: Sueldo)"><select name="b${i}_cm"><option value="PEN">S/</option><option value="USD">US$</option></select><input name="b${i}_cs" type="number" step="0.01" inputmode="decimal" placeholder="Saldo hoy"></div>
+    <div class="conf-fila conf-fila-3"><input name="b${i}_c2n" placeholder="Otra cuenta (opcional)"><select name="b${i}_c2m"><option value="PEN">S/</option><option value="USD">US$</option></select><input name="b${i}_c2s" type="number" step="0.01" inputmode="decimal" placeholder="Saldo hoy"></div>
+    <small class="conf-et">Tarjeta de crédito de este banco (opcional)</small>
+    <div class="conf-fila conf-fila-3 conf-fila-igual"><input name="b${i}_ts" type="number" step="0.01" inputmode="decimal" placeholder="Debo hoy"><input name="b${i}_tc" type="number" step="0.01" inputmode="decimal" placeholder="Pago mes"><input name="b${i}_td" type="number" min="1" max="31" placeholder="Día pago"></div>
+  </fieldset>`;
+}
+/** Crea las cuentas y la tarjeta de un bloque de banco. Devuelve cuántas creó. */
+async function guardarBloqueBanco(d, i, ordenInicial) {
+  const banco = (d[`b${i}`] || '').trim();
+  let orden = ordenInicial, n = 0;
+  const crear = async (o, saldoHoy) => {
+    let nombre = o.nombre.trim();
+    if (CM.buscarCuenta(nombre)) nombre = `${nombre} (${banco || 2})`;
+    const g = await store.guardar('cuentas', { moneda: 'PEN', activo: true, orden: orden++, banco, ...o, nombre });
+    await CM.fijarSaldo(g, Number(saldoHoy) || 0); n++;
+  };
+  const nombreCta = (txt) => (txt ? (banco && !norm(txt).includes(norm(banco)) ? `${txt.trim()} ${banco}` : txt.trim()) : `Ahorros ${banco}`);
+  if (d[`b${i}_cs`] !== '' && d[`b${i}_cs`] !== undefined && (banco || d[`b${i}_cn`])) await crear({ nombre: nombreCta(d[`b${i}_cn`]), tipo: 'liquida', moneda: d[`b${i}_cm`] }, d[`b${i}_cs`]);
+  if (d[`b${i}_c2s`] !== '' && d[`b${i}_c2s`] !== undefined && d[`b${i}_c2n`]) await crear({ nombre: nombreCta(d[`b${i}_c2n`]), tipo: 'liquida', moneda: d[`b${i}_c2m`] }, d[`b${i}_c2s`]);
+  if (d[`b${i}_ts`] !== '' && d[`b${i}_ts`] !== undefined) await crear({ nombre: banco ? `Tarjeta ${banco}` : 'Tarjeta de crédito', tipo: 'tarjeta', cuota: Number(d[`b${i}_tc`]) || '', diaPago: Number(d[`b${i}_td`]) || '' }, d[`b${i}_ts`]);
+  return n;
+}
+function activarBloquesBanco(el) {
+  const cont = el.querySelector('.conf-bancos');
+  let i = cont.querySelectorAll('.conf-banco').length;
+  el.querySelector('[data-otro-banco]').onclick = () => { cont.insertAdjacentHTML('beforeend', bloqueBanco(i++)); cont.lastElementChild.querySelector('input').focus(); };
+  cont.addEventListener('click', (e) => { if (e.target.closest('[data-quitar-banco]')) e.target.closest('.conf-banco').remove(); });
+}
+
+/** Configuración inicial: efectivo, bancos, deuda principal e ingresos. */
 function configurarInicial() {
-  const filas = [['Efectivo', 'liquida'], ['Cuenta sueldo', 'liquida'], ['Yape / Plin', 'liquida'], ['Tarjeta de crédito', 'tarjeta']];
   modal('Configura tu efectivo disponible', `
-    <p class="nota">Pon cuánto tienes <b>hoy</b> en cada cuenta (cambia los nombres por los de tus bancos). Deja en blanco las que no uses. Desde ahora, cada gasto e ingreso actualizará estos saldos.</p>
+    <p class="nota">Pon cuánto tienes y cuánto debes <b>hoy</b>. Deja en blanco lo que no uses. Desde ahora, cada gasto e ingreso actualizará estos saldos.</p>
     <form class="form conf-caja">
-      <h4 class="sub-tit">💵 Mis cuentas (lo que tengo)</h4>
-      ${filas.filter(([, t]) => t === 'liquida').map(([n], i) => `<div class="conf-fila"><input name="n${i}" value="${esc(n)}"><input name="s${i}" type="number" step="0.01" inputmode="decimal" placeholder="S/ saldo hoy"></div>`).join('')}
-      <div class="conf-fila"><input name="n3" placeholder="Otra cuenta (ej.: Interbank)"><input name="s3" type="number" step="0.01" inputmode="decimal" placeholder="S/ saldo hoy"></div>
-      <h4 class="sub-tit">🏦 Mi deuda principal (puedes agregar más después)</h4>
+      <h4 class="sub-tit">💵 Efectivo y billeteras</h4>
+      <div class="conf-fila"><input name="n0" value="Efectivo"><input name="s0" type="number" step="0.01" inputmode="decimal" placeholder="S/ tengo hoy"></div>
+      <div class="conf-fila"><input name="n1" value="Yape / Plin"><input name="s1" type="number" step="0.01" inputmode="decimal" placeholder="S/ tengo hoy"></div>
+      <h4 class="sub-tit">🏛️ Mis bancos</h4>
+      <div class="conf-bancos">${bloqueBanco(0)}${bloqueBanco(1)}</div>
+      <button type="button" class="btn btn-mini" data-otro-banco>${ic('mas2')} Otro banco</button>
+      <h4 class="sub-tit">🏦 Préstamo o deuda principal</h4>
       <div class="conf-fila"><input name="dn" placeholder="Nombre (ej.: Hipoteca BCP)"><input name="ds" type="number" step="0.01" inputmode="decimal" placeholder="S/ debo hoy"></div>
       <div class="conf-fila"><input name="dc" type="number" step="0.01" inputmode="decimal" placeholder="Cuota mensual S/"><input name="dd" type="number" min="1" max="31" placeholder="Día de pago"></div>
-      <h4 class="sub-tit">💳 Tarjeta de crédito</h4>
-      <div class="conf-fila"><input name="tn" value="Tarjeta de crédito"><input name="ts" type="number" step="0.01" inputmode="decimal" placeholder="S/ debo hoy"></div>
-      <div class="conf-fila"><input name="tc2" type="number" step="0.01" inputmode="decimal" placeholder="Pago del mes (opcional)"><input name="td" type="number" min="1" max="31" placeholder="Día de pago"></div>
+      <h4 class="sub-tit">💰 Mis ingresos de cada mes</h4>
+      <div class="conf-fila conf-fila-3"><input name="i0n" value="Sueldo"><input name="i0m" type="number" step="0.01" inputmode="decimal" placeholder="Monto S/"><input name="i0d" type="number" min="1" max="31" placeholder="Día"></div>
+      <div class="conf-fila conf-fila-3"><input name="i1n" placeholder="Otro (ej.: Clases)"><input name="i1m" type="number" step="0.01" inputmode="decimal" placeholder="Monto S/"><input name="i1d" type="number" min="1" max="31" placeholder="Día"></div>
       <div class="acciones-modal"><span class="sep"></span><button class="btn btn-pri">Guardar y ver mi disponible</button></div>
     </form>`, (el, cerrar) => {
+    activarBloquesBanco(el);
     el.querySelector('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const d = leerForm(e.target);
-      let orden = 0;
-      const crear = async (o, saldoHoy) => { const g = await store.guardar('cuentas', { moneda: 'PEN', activo: true, orden: orden++, ...o }); if (saldoHoy !== '' && saldoHoy !== undefined) await CM.fijarSaldo(g, Number(saldoHoy) || 0); };
-      for (let i = 0; i < 4; i++) if (d[`n${i}`] && d[`s${i}`] !== '') await crear({ nombre: d[`n${i}`], tipo: 'liquida' }, d[`s${i}`]);
+      let orden = CM.cuentas().length;
+      const crear = async (o, saldoHoy) => { const g = await store.guardar('cuentas', { moneda: 'PEN', activo: true, orden: orden++, ...o }); if (saldoHoy !== undefined) await CM.fijarSaldo(g, Number(saldoHoy) || 0); };
+      for (let i = 0; i < 2; i++) if (d[`n${i}`] && d[`s${i}`] !== '') await crear({ nombre: d[`n${i}`], tipo: 'liquida' }, d[`s${i}`]);
+      for (const f of el.querySelectorAll('.conf-banco')) orden += await guardarBloqueBanco(d, f.dataset.i, orden);
       if (d.dn && d.ds !== '') await crear({ nombre: d.dn, tipo: 'prestamo', cuota: Number(d.dc) || '', diaPago: Number(d.dd) || '' }, d.ds);
-      if (d.tn && d.ts !== '') await crear({ nombre: d.tn, tipo: 'tarjeta', cuota: Number(d.tc2) || '', diaPago: Number(d.td) || '' }, d.ts);
-      if (!CM.cuentas().length) { toast('Pon al menos el saldo de una cuenta'); return; }
+      const liq = CM.deTipo('liquida');
+      const primera = (liq.find((c) => /sueldo/i.test(c.nombre)) || liq.find((c) => c.banco))?.nombre || '';
+      for (let i = 0; i < 2; i++) if (d[`i${i}n`] && Number(d[`i${i}m`]) > 0) await crear({ nombre: d[`i${i}n`], tipo: 'ingreso', cuota: Number(d[`i${i}m`]), diaPago: Number(d[`i${i}d`]) || 1, categoria: i === 0 && /sueldo/i.test(d.i0n) ? 'Sueldo' : 'Otros ingresos', destino: primera });
+      if (!CM.deTipo('liquida').length) { toast('Pon al menos el saldo de una cuenta'); return; }
       toast('¡Listo! Ya ves tu efectivo disponible.');
       cerrar();
     });
   }, { ancho: 'ancho' });
+}
+
+/** Agregar un banco con sus cuentas y tarjeta, en un paso. */
+function agregarBanco() {
+  modal('Agregar banco', `<form class="form conf-caja">
+    <p class="nota">Registra tus cuentas y tu tarjeta de este banco con el saldo de hoy.</p>
+    <div class="conf-bancos">${bloqueBanco(0)}</div>
+    <button type="button" class="btn btn-mini" data-otro-banco>${ic('mas2')} Otro banco</button>
+    <div class="acciones-modal"><span class="sep"></span><button class="btn btn-pri">Guardar</button></div>
+  </form>`, (el, cerrar) => {
+    activarBloquesBanco(el);
+    el.querySelector('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = leerForm(e.target);
+      let orden = CM.cuentas().length, n = 0;
+      for (const f of el.querySelectorAll('.conf-banco')) { const k = await guardarBloqueBanco(d, f.dataset.i, orden); orden += k; n += k; }
+      if (!n) { toast('Pon el saldo de hoy de al menos una cuenta o tarjeta'); return; }
+      toast(`Listo: ${n} cuenta${n > 1 ? 's' : ''} agregada${n > 1 ? 's' : ''}`);
+      cerrar();
+    });
+  }, { ancho: 'ancho' });
+}
+
+/** Botón "Cobrado" de un ingreso esperado. */
+function cobrarIngreso(x) {
+  const c = x.c;
+  editarMovimiento(null, { tipo: 'ingreso', monto: x.pendiente, moneda: x.moneda, descripcion: c.nombre, categoria: c.categoria || 'Otros ingresos', fijoId: c.id, cuenta: c.destino || CM.deTipo('liquida')[0]?.nombre || '' });
 }
 
 /** Botón "Pagar" de un compromiso: abre el registro ya lleno. */
@@ -329,10 +408,12 @@ export function vistaCaja() {
     const comp = CM.compromisos(H.slice(0, 7), tc);
     const pendientes = comp.filter((x) => x.estado !== 'pagado');
     const prox = pendientes[0];
+    const cobros = CM.porCobrar(H.slice(0, 7), tc);
+    const xCobrar = CM.totalPorCobrar(tc);
     tarjetas = `
     <div class="caja-top">
       <div class="top-card top-ef"><span>💵 Efectivo disponible</span><b>${totalHTML(ef, tc)}</b><small>Lo que tienes hoy en tus cuentas</small></div>
-      <div class="top-card top-libre ${libre.totalPEN < 0 || (!tc && libre.PEN < 0) ? 'negativo' : ''}"><span>🟢 Libre para gastar</span><b>${totalHTML(libre, tc)}</b><small>${pendientes.length ? `Ya descontado${pendientes.length > 1 ? 's' : ''} ${pendientes.length} pago${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} del mes` : 'Este mes ya no tienes pagos pendientes'}</small></div>
+      <div class="top-card top-libre ${libre.totalPEN < 0 || (!tc && libre.PEN < 0) ? 'negativo' : ''}"><span>🟢 Libre para gastar</span><b>${totalHTML(libre, tc)}</b><small>${xCobrar.PEN || xCobrar.USD ? `Aún por cobrar: ${xCobrar.USD ? dinero(xCobrar.PEN) + ' + ' + dinero(xCobrar.USD, 'USD') : dinero(xCobrar.PEN)} (no incluido) · ` : ''}${pendientes.length ? `Ya descontado${pendientes.length > 1 ? 's' : ''} ${pendientes.length} pago${pendientes.length > 1 ? 's' : ''} pendiente${pendientes.length > 1 ? 's' : ''} del mes` : 'Este mes ya no tienes pagos pendientes'}</small></div>
       <div class="top-card top-deuda"><span>🏦 Deudas</span><b>${totalHTML(deu, tc)}</b><small>${prox ? `Próximo pago: ${esc(prox.c.nombre)} · ${esc(fmtFecha(prox.fecha))}` : 'Préstamos y tarjetas'}</small></div>
     </div>
     ${ef.faltaTC || libre.faltaTC ? `<p class="nota">Tienes cuentas en dólares: <button class="mini-link" data-tc>pon el tipo de cambio</button> para sumarlas en soles.</p>` : ''}`;
@@ -349,6 +430,15 @@ export function vistaCaja() {
         </div>`;
       }).join('')}</div>
     </section>` : '';
+    if (cobros.length) bloqueCompromisos += `
+    <section class="seccion"><h3 class="seccion-tit">${ic('subir')}Ingresos de ${esc(MESES[Number(H.slice(5, 7)) - 1])}<span class="contador">${cobros.filter((x) => x.estado !== 'cobrado').length} por cobrar</span></h3>
+      <div class="lista">${cobros.map((x, i) => `<div class="comp comp-${x.estado === 'cobrado' ? 'pagado' : 'pendiente'}">
+          <span class="mov-ic">${iconoCategoria(x.c.categoria) !== '•' ? iconoCategoria(x.c.categoria) : '💰'}</span>
+          <span class="mov-txt"><b>${esc(x.c.nombre)}</b><small>${x.estado === 'cobrado' ? '✓ Cobrado' : `Día ${Number(x.fecha.slice(8))}${x.c.destino ? ' · a ' + esc(x.c.destino) : ''}${x.cobrado ? ` · cobrado ${dinero(x.cobrado, x.moneda)}` : ''}`}</small></span>
+          <span class="mov-monto verde">${dinero(x.estado === 'cobrado' ? x.monto : x.pendiente, x.moneda)}</span>
+          ${x.estado === 'cobrado' ? '<span class="comp-ok">✓</span>' : `<button class="btn btn-mini" data-cobrar="${i}">Cobrado</button>`}
+        </div>`).join('')}</div>
+    </section>`;
   }
 
   // ---- Resumen del mes (sin pagos de deuda ni transferencias) ----
@@ -418,22 +508,32 @@ export function vistaCaja() {
   const movsHtml = Object.keys(porDia).sort().reverse().map((d) => `<div class="dia-movs"><h4 class="sub-tit">${esc(fmtFecha(d))}</h4><div class="lista">${porDia[d].map(filaMov).join('')}</div></div>`).join('');
 
   // ---- Cuentas, deudas y gastos fijos ----
-  const grupo = (tipos, titulo, tipoNuevo, textoNuevo) => {
-    const l = CM.deTipo(...tipos);
-    return `<div class="grupo-cuentas"><h4 class="sub-tit">${titulo}</h4>
-      ${l.map((c) => {
-        const s = c.tipo === 'fijo' ? null : CM.saldo(c, tc);
-        const detalle = c.tipo === 'fijo' ? `${dinero(c.cuota || 0, c.moneda)} · día ${c.diaPago || '?'}`
+  const filaCuenta = (c) => {
+        const s = c.tipo === 'fijo' || c.tipo === 'ingreso' ? null : CM.saldo(c, tc);
+        const detalle = c.tipo === 'fijo' || c.tipo === 'ingreso' ? `${dinero(c.cuota || 0, c.moneda)} · día ${c.diaPago || '?'}${c.tipo === 'ingreso' && c.destino ? ' · a ' + c.destino : ''}`
           : CM.esDeuda(c) ? `${c.cuota ? `Cuota ${dinero(c.cuota, c.moneda)}` : 'Pago: todo lo consumido'}${c.diaPago ? ` · día ${c.diaPago}` : ''}` : (c.fechaSaldo ? `Saldo actualizado: ${fmtFecha(c.fechaSaldo).toLowerCase()}` : '');
         return `<div class="cta-fila">
           <button class="cta-info" data-cuenta="${esc(c.id)}"><span>${CM.TIPOS_CUENTA[c.tipo].icono} <b>${esc(c.nombre)}</b></span><small>${esc(detalle)}</small></button>
           ${s !== null ? `<b class="${c.tipo === 'liquida' ? (s < 0 ? 'rojo' : '') : 'deuda'}">${dinero(s, c.moneda || 'PEN')}</b>` : ''}
-          ${c.tipo !== 'fijo' ? `<button class="mini" data-saldo="${esc(c.id)}" title="Actualizar saldo">Actualizar</button>` : ''}
+          ${c.tipo !== 'fijo' && c.tipo !== 'ingreso' ? `<button class="mini" data-saldo="${esc(c.id)}" title="Actualizar saldo">Actualizar</button>` : ''}
         </div>`;
-      }).join('') || '<p class="nota">Aún no registras ninguna.</p>'}
+  };
+  const grupo = (tipos, titulo, tipoNuevo, textoNuevo, lista = CM.deTipo(...tipos)) => `<div class="grupo-cuentas"><h4 class="sub-tit">${titulo}</h4>
+      ${lista.map(filaCuenta).join('') || (CM.bancos().length && tipoNuevo !== 'ingreso' && tipoNuevo !== 'fijo' ? '' : '<p class="nota">Aún no registras ninguna.</p>')}
       <button class="btn btn-mini" data-nueva-cuenta="${tipoNuevo}">${ic('mas2')} ${textoNuevo}</button>
     </div>`;
-  };
+  // Cuentas y tarjetas agrupadas por banco
+  const sumaMon = (l) => { const r = {}; for (const c of l) { const m = c.moneda || 'PEN'; r[m] = (r[m] || 0) + CM.saldo(c, tc); } return Object.entries(r).filter(([, v]) => v).map(([m, v]) => dinero(v, m)).join(' + ') || dinero(0); };
+  const bloquesBanco = CM.bancos().map((b) => {
+    const l = CM.deTipo('liquida', 'tarjeta', 'prestamo').filter((c) => norm(c.banco) === norm(b));
+    const tiene = l.filter((c) => c.tipo === 'liquida'), debe = l.filter((c) => c.tipo !== 'liquida');
+    return `<div class="grupo-cuentas banco">
+      <h4 class="banco-cab"><span>🏛️ ${esc(b)}</span><small>${tiene.length ? `Tienes <b>${sumaMon(tiene)}</b>` : ''}${tiene.length && debe.length ? ' · ' : ''}${debe.length ? `Debes <b class="deuda">${sumaMon(debe)}</b>` : ''}</small></h4>
+      ${l.map(filaCuenta).join('')}
+      <div class="banco-acc"><button class="mini" data-nueva-cuenta="liquida" data-banco="${esc(b)}">+ Cuenta</button><button class="mini" data-nueva-cuenta="tarjeta" data-banco="${esc(b)}">+ Tarjeta</button><button class="mini" data-nueva-cuenta="prestamo" data-banco="${esc(b)}">+ Préstamo</button></div>
+    </div>`;
+  }).join('');
+  const sinBanco = (...tipos) => CM.deTipo(...tipos).filter((c) => !(c.banco || '').trim());
 
   const html = `
   <header class="vista-cab">
@@ -467,9 +567,11 @@ export function vistaCaja() {
     </div>
     <div>
       <section class="seccion"><h3 class="seccion-tit">${ic('usuario')}Cuentas, deudas y fijos</h3>
-        ${grupo(['liquida'], '💵 Mis cuentas', 'liquida', 'Cuenta')}
-        ${grupo(['prestamo', 'tarjeta'], '🏦 Mis deudas', 'prestamo', 'Deuda o préstamo')}
-        <button class="btn btn-mini btn-solo" data-nueva-cuenta="tarjeta">${ic('mas2')} Tarjeta de crédito</button>
+        ${bloquesBanco}
+        <button class="btn btn-mini btn-solo" data-agregar-banco>${ic('mas2')} Agregar banco</button>
+        ${grupo(['liquida'], '💵 Efectivo y otras cuentas', 'liquida', 'Cuenta', sinBanco('liquida'))}
+        ${grupo(['prestamo', 'tarjeta'], '🏦 Otras deudas', 'prestamo', 'Deuda o préstamo', sinBanco('prestamo', 'tarjeta'))}
+        ${grupo(['ingreso'], '💰 Ingresos de cada mes', 'ingreso', 'Ingreso (sueldo, clases, alquiler…)')}
         ${grupo(['fijo'], '📌 Gastos fijos mensuales', 'fijo', 'Gasto fijo')}
       </section>
       <section class="seccion"><h3 class="seccion-tit">${ic('bandera')}Gastos por categoría<button class="mini-link" data-pres>Presupuestos</button></h3>
@@ -496,7 +598,10 @@ export function vistaCaja() {
       el.querySelectorAll('[data-pagar]').forEach((b) => b.onclick = () => pagarCompromiso(comp[Number(b.dataset.pagar)]));
       el.querySelectorAll('[data-cuenta]').forEach((b) => b.onclick = () => editarCuenta(b.dataset.cuenta));
       el.querySelectorAll('[data-saldo]').forEach((b) => b.onclick = () => editarCuenta(b.dataset.saldo, { soloSaldo: true }));
-      el.querySelectorAll('[data-nueva-cuenta]').forEach((b) => b.onclick = () => editarCuenta(null, { tipo: b.dataset.nuevaCuenta }));
+      el.querySelectorAll('[data-nueva-cuenta]').forEach((b) => b.onclick = () => editarCuenta(null, { tipo: b.dataset.nuevaCuenta, banco: b.dataset.banco || '' }));
+      el.querySelector('[data-agregar-banco]')?.addEventListener('click', agregarBanco);
+      const cobros = configurado ? CM.porCobrar(H.slice(0, 7), tc) : [];
+      el.querySelectorAll('[data-cobrar]').forEach((b) => b.onclick = () => cobrarIngreso(cobros[Number(b.dataset.cobrar)]));
       el.querySelectorAll('[data-mes]').forEach((b) => b.onclick = () => {
         const d = Number(b.dataset.mes);
         mesActual = d === 0 ? hoy().slice(0, 7) : moverMes(mesActual, d);

@@ -114,12 +114,17 @@ export async function cargarDemo() {
   const ahoraIso = new Date(Date.now() - 86400000 * 13).toISOString();
   await store.guardarVarios('cuentas', [
     { nombre: 'Efectivo', tipo: 'liquida', moneda: 'PEN', saldoInicial: 600, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 0, activo: true },
-    { nombre: 'Cuenta sueldo', tipo: 'liquida', moneda: 'PEN', saldoInicial: 4200, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 1, activo: true },
-    { nombre: 'Yape / Plin', tipo: 'liquida', moneda: 'PEN', saldoInicial: 150, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 2, activo: true },
-    { nombre: 'Hipoteca', tipo: 'prestamo', moneda: 'PEN', saldoInicial: 200000, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: 5200, diaPago: 15, orden: 3, activo: true, nota: 'Ejemplo' },
-    { nombre: 'Tarjeta de crédito', tipo: 'tarjeta', moneda: 'PEN', saldoInicial: 1200, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: '', diaPago: 25, orden: 4, activo: true },
-    { nombre: 'Alquiler', tipo: 'fijo', moneda: 'PEN', cuota: 1800, diaPago: 5, categoria: 'Vivienda', orden: 5, activo: true },
-    { nombre: 'Pensión del colegio', tipo: 'fijo', moneda: 'PEN', cuota: 950, diaPago: 8, categoria: 'Educación', orden: 6, activo: true },
+    { nombre: 'Yape / Plin', tipo: 'liquida', moneda: 'PEN', saldoInicial: 150, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 1, activo: true },
+    { nombre: 'Cuenta sueldo', banco: 'Interbank', tipo: 'liquida', moneda: 'PEN', saldoInicial: 4200, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 2, activo: true },
+    { nombre: 'Tarjeta de crédito', banco: 'Interbank', tipo: 'tarjeta', moneda: 'PEN', saldoInicial: 1200, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: '', diaPago: 25, orden: 3, activo: true },
+    { nombre: 'Ahorros BCP', banco: 'BCP', tipo: 'liquida', moneda: 'PEN', saldoInicial: 2500, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 4, activo: true },
+    { nombre: 'Ahorros BCP dólares', banco: 'BCP', tipo: 'liquida', moneda: 'USD', saldoInicial: 900, fechaSaldo: d(-13), saldoEn: ahoraIso, orden: 5, activo: true },
+    { nombre: 'Visa BCP', banco: 'BCP', tipo: 'tarjeta', moneda: 'PEN', saldoInicial: 800, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: 400, diaPago: 10, orden: 6, activo: true },
+    { nombre: 'Hipoteca', banco: 'BCP', tipo: 'prestamo', moneda: 'PEN', saldoInicial: 200000, fechaSaldo: d(-13), saldoEn: ahoraIso, cuota: 5200, diaPago: 15, orden: 7, activo: true, nota: 'Ejemplo' },
+    { nombre: 'Alquiler', tipo: 'fijo', moneda: 'PEN', cuota: 1800, diaPago: 5, categoria: 'Vivienda', orden: 8, activo: true },
+    { nombre: 'Pensión del colegio', tipo: 'fijo', moneda: 'PEN', cuota: 950, diaPago: 8, categoria: 'Educación', orden: 9, activo: true },
+    { nombre: 'Sueldo', tipo: 'ingreso', moneda: 'PEN', cuota: 8500, diaPago: 1, categoria: 'Sueldo', destino: 'Cuenta sueldo', orden: 10, activo: true },
+    { nombre: 'Clases particulares', tipo: 'ingreso', moneda: 'PEN', cuota: 1200, diaPago: 28, categoria: 'Clases', destino: 'Ahorros BCP', orden: 11, activo: true },
   ]);
   await store.guardarVarios('movimientos', [
     mv(-12, 'ingreso', 8500, 'PEN', 'Sueldo', 'Sueldo noviembre', 'Cuenta sueldo'),
