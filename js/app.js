@@ -171,11 +171,17 @@ async function iniciar() {
 
   // Primera vez (sin datos ni conexión): página de bienvenida
   const vacio = store.TABLAS.every((t) => store.todos(t).length === 0);
-  if (vacio && !conectado(cfg) && !localStorage.getItem('control.iniciado')) {
+  if (vacio && !conectado(cfg) && !localStorage.getItem('control.iniciado') && !location.hash.startsWith('#/unirse') && !localStorage.getItem('control.invitacion')) {
     location.hash = '#/bienvenida';
   } else if (!localStorage.getItem('control.iniciado')) {
     localStorage.setItem('control.iniciado', '1');
   }
+  // Invitación pendiente (abrió el enlace, pero instaló la app o entró con Google por otro lado)
+  try {
+    const inv = JSON.parse(localStorage.getItem('control.invitacion') || 'null');
+    if (inv?.u && !EQ.configurado() && !location.hash.startsWith('#/unirse')) location.hash = `#/unirse?u=${encodeURIComponent(inv.u)}&j=${encodeURIComponent(inv.j || '')}`;
+    if (EQ.configurado()) localStorage.removeItem('control.invitacion');
+  } catch { /* */ }
   // Precargar Google para que "reconectar" abra su ventana al primer toque
   if (cfg.modo === 'google' && G.configurado()) G.cargarGIS().catch(() => {});
 

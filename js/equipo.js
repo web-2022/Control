@@ -708,6 +708,8 @@ function editarMiembro(id, op = {}) {
 //  UNIRSE (enlace de invitación)
 // ============================================================
 export function vistaUnirse(q = {}) {
+  // Recordar la invitación: si instala la app o entra con Google desde otra pantalla, se retoma sola
+  if (q.u) localStorage.setItem('control.invitacion', JSON.stringify({ u: q.u, j: q.j || '' }));
   const url = q.u || '';
   const jefe = q.j || 'Tu jefe';
   const logueado = store.config().modo === 'google' && store.config().googleEmail;
@@ -736,6 +738,7 @@ export function vistaUnirse(q = {}) {
           }
           msg.textContent = 'Conectando con el equipo…';
           await EQ.conectar(url);
+          localStorage.removeItem('control.invitacion');
           localStorage.setItem('control.iniciado', '1');
           location.hash = EQ.activo() ? (EQ.veEquipo() ? '#/panel' : '#/midia') : '#/midia';
           toast(EQ.activo() ? '¡Ya estás en el equipo!' : 'Solicitud enviada. Tu jefe debe aprobarte.', null, 6000);
