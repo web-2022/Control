@@ -732,3 +732,76 @@ em.defecto { font-style: normal; font-size: 11px; color: var(--acento); font-wei
 .asig-fila span { display: flex; flex-direction: column; min-width: 0; }
 .asig-fila small { color: var(--tenue); font-size: 12px; }
 .asig-fila select { min-width: 0; }
+
+/* ---------------- Equipo en línea ---------------- */
+.aviso-rojo { background: var(--rojo-suave); border-color: color-mix(in srgb, var(--rojo) 40%, transparent); }
+.aviso-rojo .ic { color: var(--rojo); }
+.aviso-verde { background: var(--verde-suave); border-color: color-mix(in srgb, var(--verde) 35%, transparent); }
+.aviso-verde .ic { color: var(--verde); }
+.badge.azul { background: var(--azul); }
+.azul { color: var(--azul) !important; }
+.eq-sync { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--tenue); font: 12.5px var(--fuente); padding: 0; margin: -6px 0 12px; cursor: pointer; }
+.eq-sync .ic { width: 14px; height: 14px; }
+.eq-sync-error, .eq-sync-reauth { color: var(--rojo); font-weight: 600; }
+.eq-sync-sync .ic { animation: girar 1s linear infinite; }
+@keyframes girar { to { transform: rotate(360deg); } }
+.eq-ayuda { margin: -10px 0 14px; font-size: 12.5px; }
+.eq-est { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--borde2); background: var(--sup); color: var(--txt2); font-size: 15px; line-height: 1; display: grid; place-items: center; cursor: pointer; margin: 2px 2px 0 0; transition: transform .1s; }
+.eq-est:active { transform: scale(.9); }
+.eq-est.est-curso { border-color: var(--azul); color: var(--azul); background: var(--azul-suave); }
+.eq-est.est-hecho { border-color: var(--verde); background: var(--verde); color: #fff; font-weight: 800; }
+.eq-est.est-bloqueado { border-color: var(--rojo); background: var(--rojo-suave); font-size: 13px; }
+.eq-nuevas .lista { border-color: color-mix(in srgb, var(--azul) 45%, transparent); }
+.eq-cierre { background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 12px 14px; margin: 0; white-space: pre-wrap; }
+.eq-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.eq-persona { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 12px 14px; background: var(--sup); border: 1px solid var(--borde); border-left: 4px solid var(--borde2); border-radius: var(--radio); color: var(--txt); font: inherit; cursor: pointer; transition: transform .12s, border-color .12s; }
+.eq-persona:hover { transform: translateY(-1px); border-color: var(--borde2); }
+.eq-sem-ok { border-left-color: var(--verde); }
+.eq-sem-tarde { border-left-color: var(--acento); }
+.eq-sem-falta { border-left-color: var(--rojo); }
+.eq-p-cab { display: flex; align-items: center; gap: 10px; }
+.eq-p-cab > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.eq-p-cab b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.eq-p-cab small { color: var(--tenue); font-size: 12px; }
+.eq-p-cab .avatar { width: 36px; height: 36px; font-size: 13px; }
+.eq-barra { height: 6px; border-radius: 3px; background: var(--borde); overflow: hidden; }
+.eq-barra span { display: block; height: 100%; background: var(--verde); border-radius: 3px; }
+.eq-nums { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--txt2); }
+.eq-nums b { color: var(--txt); margin-right: 2px; }
+.eq-nums .rojo b, .eq-nums .azul b { color: inherit; }
+.eq-ult { color: var(--tenue); font-size: 11.5px; }
+.seg-mini { gap: 0; border: 1px solid var(--borde2); border-radius: var(--radio-s); overflow: hidden; }
+.seg-btn { border: 0; background: transparent; color: var(--txt2); font: 600 13px var(--fuente); padding: 7px 12px; cursor: pointer; }
+.seg-btn.activo { background: var(--acento-suave); color: var(--acento); }
+.eq-semana-wrap { overflow-x: auto; margin-bottom: 18px; }
+.eq-semana { width: 100%; border-collapse: collapse; font-size: 13px; }
+.eq-semana th, .eq-semana td { padding: 7px 8px; border-bottom: 1px solid var(--borde); text-align: center; white-space: nowrap; }
+.eq-semana th:first-child { text-align: left; }
+.eq-semana thead th { color: var(--tenue); font-weight: 600; font-size: 12px; text-transform: capitalize; }
+.eq-semana thead th.hoy { color: var(--acento); }
+.eq-semana td small { display: block; color: var(--txt2); font-size: 11px; }
+.eq-semana td i { font-style: normal; color: var(--verde); font-size: 11px; }
+.eq-fut { color: var(--tenue); }
+.eq-coms ul, .eq-cierres { list-style: none; padding: 0; margin: 0 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.eq-coms li, .eq-cierres li { background: var(--fondo); border: 1px solid var(--borde); border-radius: var(--radio-s); padding: 8px 10px; font-size: 13.5px; }
+.eq-coms time { color: var(--tenue); font-size: 12px; }
+.eq-coms p, .eq-cierres p { margin: 3px 0 0; white-space: pre-wrap; }
+.seg-eq { flex-wrap: wrap; margin-bottom: 12px; }
+.seg-eq .seg { flex: 1 1 22%; } .seg-eq .seg span { display: block; text-align: center; padding: 8px 4px; font-size: 13px; }
+.seg-eq input:checked + span { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); font-weight: 600; }
+.form-eq .solo-bloqueado, .form-eq .solo-curso { display: none; }
+.form-eq[data-estado="bloqueado"] .solo-bloqueado, .form-eq[data-estado="curso"] .solo-curso { display: flex; }
+.form-eq input[type=range] { accent-color: var(--azul); padding: 0; }
+.avatar-mini { width: 26px; height: 26px; font-size: 11px; display: inline-grid; vertical-align: middle; }
+.rol { font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: var(--borde); color: var(--txt2); margin-left: 4px; }
+.rol-jefe { background: var(--acento-suave); color: var(--acento); }
+.rol-lider { background: var(--azul-suave); color: var(--azul); }
+.eq-enlace { display: flex; gap: 8px; flex-wrap: wrap; }
+.eq-enlace input { flex: 1 1 220px; min-width: 0; font-size: 12.5px; color: var(--txt2); }
+.eq-pasos { padding-left: 20px; margin: 0 0 12px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; line-height: 1.45; }
+.eq-pasos code { font-size: 12.5px; background: var(--borde); padding: 1px 5px; border-radius: 4px; }
+.eq-unirse .bv-hero { padding-top: 8vh; }
+@media (max-width: 860px) {
+  .eq-rejilla { grid-template-columns: 1fr; }
+  .eq-detalle .cap-linea { margin-bottom: 10px; }
+}

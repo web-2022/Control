@@ -9,6 +9,8 @@ import * as MD from './modales.js';
 import { expandidos } from './componentes.js';
 import { vistaDiario } from './diario.js';
 import { vistaCaja } from './caja.js';
+import * as EQV from './equipo.js';
+import * as EQ from './equipo-datos.js';
 import { iniciarInstalacion, actualizarBotones } from './instalar.js';
 import { vistaBienvenida } from './bienvenida.js';
 import { iniciarCompartir } from './compartir.js';
@@ -40,14 +42,19 @@ const RUTAS = {
   ajustes: () => V.vistaAjustes(),
   mas: () => V.vistaMas(),
   bienvenida: () => vistaBienvenida(),
+  midia: () => EQV.vistaMiDia(),
+  panel: () => EQV.vistaPanel(),
+  miembros: () => EQV.vistaMiembros(),
+  unirse: (_, q) => EQV.vistaUnirse(q),
 };
 
 function rutaActual() {
-  const h = location.hash.replace(/^#\/?/, '') || 'hoy';
+  const inicio = EQ.activo() && EQ.miRol() === 'ingeniero' ? 'midia' : 'hoy';
+  const h = location.hash.replace(/^#\/?/, '') || inicio;
   const [camino, consulta = ''] = h.split('?');
   const [nombre, param] = camino.split('/');
   const q = Object.fromEntries(new URLSearchParams(consulta));
-  return { nombre: RUTAS[nombre] ? nombre : 'hoy', param: param ? decodeURIComponent(param) : null, q };
+  return { nombre: RUTAS[nombre] ? nombre : inicio, param: param ? decodeURIComponent(param) : null, q };
 }
 
 /** Dibuja la vista actual conservando foco y desplazamiento. */
@@ -61,7 +68,7 @@ function render(cambioDeRuta = false) {
   const selIni = focoId && 'selectionStart' in activo ? activo.selectionStart : null;
 
   limpiarVista?.();
-  const v = RUTAS[nombre](param);
+  const v = RUTAS[nombre](param, q);
   document.body.classList.toggle('modo-limpio', v.layout === 'limpio');
   cont.innerHTML = v.html;
   document.title = `${v.titulo} · Control`;
@@ -70,8 +77,8 @@ function render(cambioDeRuta = false) {
   cont._limpiar = null;
 
   // Navegación activa
-  const base = { reunion: 'reuniones', persona: 'equipo', proyecto: 'proyectos' }[nombre] || nombre;
-  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes', 'diario', 'caja'].includes(base))));
+  const base = { reunion: 'reuniones', persona: 'equipo', proyecto: 'proyectos', miembros: 'panel' }[nombre] || nombre;
+  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('activo', a.dataset.nav === base || (a.dataset.nav === 'mas' && ['equipo', 'proyectos', 'revision', 'ajustes', 'diario', 'caja', ...(EQ.veEquipo() ? [] : ['panel']), ...(EQ.miRol() === 'ingeniero' ? [] : ['midia'])].includes(base))));
   actualizarContadores();
   actualizarBotones();
 
@@ -89,6 +96,15 @@ function actualizarContadores() {
   const v = M.vencidos().length;
   document.querySelectorAll('[data-badge="inbox"]').forEach((b) => { b.textContent = n || ''; b.hidden = !n; });
   document.querySelectorAll('[data-badge="vencidos"]').forEach((b) => { b.textContent = v || ''; b.hidden = !v; });
+  // Equipo en línea: mostrar u ocultar accesos y contadores
+  const enEquipo = EQ.activo();
+  document.querySelectorAll('[data-solo-equipo]').forEach((a) => { a.hidden = !enEquipo; });
+  document.querySelectorAll('[data-solo-lider]').forEach((a) => { a.hidden = !EQ.veEquipo(); });
+  document.querySelectorAll('[data-solo-ingeniero]').forEach((a) => { a.hidden = !(enEquipo && EQ.miRol() === 'ingeniero'); });
+  document.querySelectorAll('.nav-inferior [data-sin-equipo]').forEach((a) => { a.hidden = enEquipo; });
+  const ce = EQV.contadoresEquipo();
+  document.querySelectorAll('[data-badge="midia"]').forEach((b) => { b.textContent = ce.midia || ''; b.hidden = !ce.midia; });
+  document.querySelectorAll('[data-badge="panel"]').forEach((b) => { b.textContent = ce.panel || ''; b.hidden = !ce.panel; });
   if ('setAppBadge' in navigator) { (v ? navigator.setAppBadge(v) : navigator.clearAppBadge()).catch(() => {}); }
 }
 
@@ -147,6 +163,7 @@ async function iniciar() {
   const cfg = store.config();
   document.documentElement.dataset.tema = cfg.tema || 'auto';
   await store.iniciar();
+  await EQ.iniciarEquipo().catch((e) => console.warn('Equipo', e));
 
   // Primera vez (sin datos ni conexión): página de bienvenida
   const vacio = store.TABLAS.every((t) => store.todos(t).length === 0);
@@ -164,7 +181,7 @@ async function iniciar() {
   if (!vozDisponible()) $('#fab-voz').classList.add('sin-voz');
   $('#sync').addEventListener('click', async () => {
     if (estadoSync().estado === 'reauth') {
-      try { await reconectarGoogle(); toast('Reconectado con Google'); } catch (e) { toast(e.message); }
+      try { await reconectarGoogle(); toast('Reconectado con Google'); EQ.sincronizarEquipo(); } catch (e) { toast(e.message); }
     } else if (conectado()) sincronizar();
     else location.hash = '#/ajustes';
   });
@@ -174,7 +191,7 @@ async function iniciar() {
     if (store.config().modo === 'google' && estadoSync().estado === 'reauth' && G.configurado() && window.google?.accounts
       && Date.now() - ultimoIntento > 120000) {
       ultimoIntento = Date.now();
-      reconectarGoogle().catch(() => {});
+      reconectarGoogle().then(() => EQ.sincronizarEquipo()).catch(() => {});
     }
   }, { capture: true });
   const buscar = $('#buscar-global');
@@ -197,6 +214,7 @@ async function iniciar() {
     if (tipo === 'cambio') actualizarContadores();
   });
   alCambiarEstado(pintarSync);
+  EQ.suscribir((tipo) => { if (!enSilencio() && (tipo === 'cambio' || /^(midia|panel|miembros)/.test(location.hash.slice(2)))) renderDiferido(); actualizarContadores(); });
   render(true);
   iniciarAuto();
 

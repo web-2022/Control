@@ -47,6 +47,8 @@ try {
 } catch { /* sin token guardado */ }
 
 export const tokenValido = () => !!token && Date.now() < expira - 60000;
+/** Token vigente (para el servidor del equipo). */
+export const tokenActual = () => (tokenValido() ? token : null);
 export const minutosRestantes = () => Math.max(0, Math.round((expira - Date.now()) / 60000));
 
 function guardarToken(t, segundos) {

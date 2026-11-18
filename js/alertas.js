@@ -13,6 +13,7 @@ import { toast, descargar } from './ui.js';
 import { hoy, addDias, pad, fmtFecha } from './util.js';
 import { URL_APP } from './config.js';
 import { compromisos } from './caja-modelo.js';
+import * as EQ from './equipo-datos.js';
 
 // Opciones de aviso (minutos antes). '' = usar el predeterminado de Ajustes.
 export const OPCIONES_AVISO = [
@@ -209,6 +210,25 @@ export function revisarAlertas() {
       avisados[k] = H;
       const monto = `${x.moneda === 'USD' ? 'US$' : 'S/'} ${x.pendiente.toFixed(2)}`;
       avisar({ clave: k, titulo: `🏦 ${faltan ? 'En 3 días' : 'Hoy'} vence: ${x.c.nombre}`, cuerpo: `${monto} · día ${Number(x.fecha.slice(8))}`, url: '#/caja' });
+    }
+  }
+  // Equipo: recordar el plan del día (15 min antes y a la hora límite) y avisar lo que te asignan
+  if (EQ.activo()) {
+    const yo = EQ.miEmail();
+    const limite = Number(EQ.configEquipo().horaPlan || 9);
+    const d = new Date();
+    const min = d.getHours() * 60 + d.getMinutes();
+    if (!EQ.esJefe() && EQ.esDiaLaborable() && !EQ.estadoDia(yo).planIso) {
+      const k1 = `eq-plan-${H}-antes`, k2 = `eq-plan-${H}-hora`;
+      if (!avisados[k1] && min >= limite * 60 - 15 && min < limite * 60) { avisados[k1] = H; avisar({ clave: k1, titulo: '📝 Carga tu plan del día', cuerpo: `Antes de las ${limite}:00 · toca para abrir Mi día`, url: '#/midia' }); }
+      if (!avisados[k2] && min >= limite * 60 && min < limite * 60 + 120) { avisados[k2] = H; avisar({ clave: k2, titulo: '⏰ Aún no cargas tu plan de hoy', cuerpo: 'Tu jefe lo verá en el panel del equipo', url: '#/midia' }); }
+    }
+    for (const t of EQ.tareas()) {
+      if (t.asignadoA !== yo || t.creadoPor === yo || t.visto || t.estado === 'hecho') continue;
+      const k = `eq-asig-${t.id}`;
+      if (avisados[k]) continue;
+      avisados[k] = H;
+      avisar({ clave: k, titulo: `📌 ${EQ.primerNombre(t.creadoPor)} te asignó un pendiente`, cuerpo: `${t.titulo}${t.fecha ? ' · ' + fmtFecha(t.fecha) : ''}`, url: '#/midia' });
     }
   }
   // Resumen de vencidos una vez al día
