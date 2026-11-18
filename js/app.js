@@ -49,7 +49,7 @@ const RUTAS = {
 };
 
 function rutaActual() {
-  const inicio = EQ.activo() && EQ.miRol() === 'ingeniero' ? 'midia' : 'hoy';
+  const inicio = EQ.configurado() && EQ.miRol() !== 'jefe' ? 'midia' : 'hoy';
   const h = location.hash.replace(/^#\/?/, '') || inicio;
   const [camino, consulta = ''] = h.split('?');
   const [nombre, param] = camino.split('/');
@@ -97,11 +97,15 @@ function actualizarContadores() {
   document.querySelectorAll('[data-badge="inbox"]').forEach((b) => { b.textContent = n || ''; b.hidden = !n; });
   document.querySelectorAll('[data-badge="vencidos"]').forEach((b) => { b.textContent = v || ''; b.hidden = !v; });
   // Equipo en línea: mostrar u ocultar accesos y contadores
-  const enEquipo = EQ.activo();
+  // "Mi día" se muestra apenas se une (aunque esté esperando aprobación) para que vea su estado
+  const enEquipo = EQ.configurado();
+  const rol = EQ.miRol();
   document.querySelectorAll('[data-solo-equipo]').forEach((a) => { a.hidden = !enEquipo; });
   document.querySelectorAll('[data-solo-lider]').forEach((a) => { a.hidden = !EQ.veEquipo(); });
-  document.querySelectorAll('[data-solo-ingeniero]').forEach((a) => { a.hidden = !(enEquipo && EQ.miRol() === 'ingeniero'); });
+  // Celular: ingeniero y líder tienen "Mi día" abajo (el líder en lugar de "Hoy"; el jefe conserva "Hoy")
+  document.querySelectorAll('[data-solo-ingeniero]').forEach((a) => { a.hidden = !(enEquipo && rol !== 'jefe'); });
   document.querySelectorAll('.nav-inferior [data-sin-equipo]').forEach((a) => { a.hidden = enEquipo; });
+  document.querySelectorAll('.nav-inferior [data-nav="hoy"]').forEach((a) => { a.hidden = rol === 'lider'; });
   const ce = EQV.contadoresEquipo();
   document.querySelectorAll('[data-badge="midia"]').forEach((b) => { b.textContent = ce.midia || ''; b.hidden = !ce.midia; });
   document.querySelectorAll('[data-badge="panel"]').forEach((b) => { b.textContent = ce.panel || ''; b.hidden = !ce.panel; });
