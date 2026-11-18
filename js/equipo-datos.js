@@ -77,7 +77,10 @@ export async function iniciarEquipo() {
 }
 
 // ---------------- Lectura ----------------
-export const tareas = () => [...datos.tareas.values()].filter((t) => !t.deleted);
+/** Sugerencia aún sin tomar (o rechazada): no cuenta como pendiente de nadie. */
+export const esSugerencia = (t) => t.sugerencia === 'pendiente' || t.sugerencia === 'rechazada';
+export const tareas = () => [...datos.tareas.values()].filter((t) => !t.deleted && !esSugerencia(t));
+export const sugerencias = () => [...datos.tareas.values()].filter((t) => !t.deleted && esSugerencia(t));
 export const tarea = (id) => { const t = datos.tareas.get(id); return t && !t.deleted ? t : null; };
 export const miembros = () => [...datos.miembros.values()].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
 export const activos = () => miembros().filter((m) => m.estado === 'activo');
@@ -173,6 +176,10 @@ export async function comentarTarea(id, texto) {
   return guardarTarea({ id, comentarios: [...(t.comentarios || []), c] });
 }
 export const borrarTarea = (id) => guardarTarea({ id, deleted: true });
+/** Respuesta a una sugerencia de un compañero. */
+export function responderSugerencia(id, acepta, respuesta = '') {
+  return guardarTarea({ id, sugerencia: acepta ? 'aceptada' : 'rechazada', respuesta: respuesta.slice(0, 500), visto: true, ...(acepta ? {} : { estado: 'pendiente' }) });
+}
 
 export async function guardarPlan(cambios, fecha = hoy()) {
   const id = `${miEmail()}|${fecha}`;

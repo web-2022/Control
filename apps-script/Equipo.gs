@@ -30,13 +30,15 @@ var NOMBRE_LIBRO = 'Control – Equipo';
 var HOJAS = { miembros: 'Miembros', tareas: 'Tareas', planes: 'Planes', config: 'Config', archivo: 'Archivo' };
 var COLS = {
   miembros: ['id', 'email', 'nombre', 'rol', 'lider', 'estado', 'cargo', 'creado', 'updatedAt', '_srv'],
-  tareas: ['id', 'titulo', 'nota', 'asignadoA', 'creadoPor', 'fecha', 'prioridad', 'proyecto', 'estado', 'motivo', 'avance', 'comentarios', 'visto', 'completado', 'creado', 'updatedAt', 'deleted', '_srv'],
+  tareas: ['id', 'titulo', 'nota', 'asignadoA', 'creadoPor', 'fecha', 'prioridad', 'proyecto', 'estado', 'motivo', 'avance', 'comentarios', 'visto', 'completado', 'sugerencia', 'respuesta', 'creado', 'updatedAt', 'deleted', '_srv'],
   planes: ['id', 'email', 'fecha', 'enviado', 'cierre', 'comentario', 'creado', 'updatedAt', '_srv'],
   config: ['clave', 'valor'],
 };
 COLS.archivo = COLS.tareas;
 var CONFIG_DEFECTO = { horaPlan: '9', dias: '1,2,3,4,5', correoRecordatorio: 'si', correoAsignacion: 'si', correoResumen: 'si', nombreEquipo: 'Mi equipo' };
-var CAMPOS_TAREA = ['titulo', 'nota', 'asignadoA', 'fecha', 'prioridad', 'proyecto', 'estado', 'motivo', 'avance', 'visto', 'completado', 'deleted'];
+var CAMPOS_TAREA = ['titulo', 'nota', 'asignadoA', 'fecha', 'prioridad', 'proyecto', 'estado', 'motivo', 'avance', 'visto', 'completado', 'sugerencia', 'respuesta', 'deleted'];
+// Quien sugirió algo a alguien fuera de su equipo solo puede editar esto (o eliminarlo)
+var CAMPOS_SUGERENTE = ['titulo', 'nota', 'deleted'];
 
 // ---------------- Entrada HTTP ----------------
 function doGet() {
@@ -250,8 +252,11 @@ function manejar(req) {
       if (!t || !t.id) return;
       var ex = T.fila[t.id];
       var destino = String(t.asignadoA || (ex && ex.asignadoA) || email).toLowerCase();
-      var permitido = ex ? (puede(ex.asignadoA) || ex.creadoPor === email) && (destino === ex.asignadoA || puede(destino)) : puede(destino);
+      // Sugerencia: cualquiera puede sugerir a un compañero activo; la persona decide si la toma
+      var esSugerenciaNueva = !ex && !puede(destino) && t.sugerencia === 'pendiente' && destino !== email && M.fila[destino] && M.fila[destino].estado === 'activo';
+      var permitido = ex ? (puede(ex.asignadoA) || ex.creadoPor === email) && (destino === ex.asignadoA || puede(destino)) : (puede(destino) || esSugerenciaNueva);
       if (!permitido) return;
+      var soloSugerente = ex && !puede(ex.asignadoA) && ex.creadoPor === email;
       var o = { id: t.id, _srv: stamp };
       // Comentarios: se combinan (nadie pierde lo que escribió)
       var previos = ex ? parsear(ex.comentarios, []) : [];
@@ -261,7 +266,8 @@ function manejar(req) {
         .sort(function (a, b) { return String(a.ts).localeCompare(String(b.ts)); });
       var masNuevo = !ex || String(t.updatedAt || '') >= String(ex.updatedAt || '');
       if (masNuevo) {
-        CAMPOS_TAREA.forEach(function (k) { if (t[k] !== undefined) o[k] = t[k]; });
+        (soloSugerente ? CAMPOS_SUGERENTE : CAMPOS_TAREA).forEach(function (k) { if (t[k] !== undefined) o[k] = t[k]; });
+        if (esSugerenciaNueva) { o.sugerencia = 'pendiente'; o.estado = 'pendiente'; }
         o.asignadoA = destino;
         o.updatedAt = t.updatedAt || ahora.toISOString();
       }
@@ -269,7 +275,7 @@ function manejar(req) {
       // Solo quien la creó (o su jefe/líder) puede eliminarla
       if (ex && o.deleted && String(o.deleted) === 'true' && ex.creadoPor !== email && !(puede(ex.asignadoA) && ex.asignadoA !== email)) delete o.deleted;
       var asignacionNueva = masNuevo && destino !== email && (!ex || ex.asignadoA !== destino);
-      if (asignacionNueva) { o.visto = ''; correos.push({ a: destino, titulo: t.titulo || (ex && ex.titulo), fecha: t.fecha || (ex && ex.fecha), prioridad: t.prioridad || (ex && ex.prioridad) }); }
+      if (asignacionNueva) { o.visto = ''; correos.push({ a: destino, titulo: t.titulo || (ex && ex.titulo), fecha: t.fecha || (ex && ex.fecha), prioridad: t.prioridad || (ex && ex.prioridad), sugerencia: esSugerenciaNueva }); }
       poner(T, o);
     });
     guardarNuevas(T);
@@ -327,10 +333,11 @@ function avisarAsignaciones(lista, me, M) {
     if (!quedanCorreos(15)) return;
     var dest = M.fila[x.a];
     if (!dest) return;
-    var cuerpo = 'Hola ' + (dest.nombre || '').split(' ')[0] + ',\n\n' + (me.nombre || me.email) + ' te asignó un pendiente en Control:\n\n'
+    var quien = me.nombre || me.email;
+    var cuerpo = 'Hola ' + (dest.nombre || '').split(' ')[0] + ',\n\n' + quien + (x.sugerencia ? ' cree que esto te corresponde. Ábrelo en Control y elige "Lo tomo" o "No me corresponde":\n\n' : ' te asignó un pendiente en Control:\n\n')
       + '• ' + x.titulo + (x.fecha ? '\n  Fecha: ' + x.fecha : '') + (x.prioridad ? '\n  Prioridad: ' + x.prioridad : '')
       + '\n\nÁbrelo aquí: ' + URL_APP + '#/midia\n';
-    MailApp.sendEmail({ to: x.a, subject: 'Nuevo pendiente: ' + x.titulo, body: cuerpo, name: 'Control' });
+    MailApp.sendEmail({ to: x.a, subject: (x.sugerencia ? 'Sugerencia de ' + quien.split(' ')[0] + ': ' : 'Nuevo pendiente: ') + x.titulo, body: cuerpo, name: 'Control' });
   });
 }
 
@@ -358,7 +365,7 @@ function cadaHora() {
 
 /** Estado del día de cada persona (para el correo de las 9:00). */
 function estadoDia(T, P, email, hoy) {
-  var suyas = T.filas.filter(function (t) { return t.asignadoA === email && t.deleted !== 'true'; });
+  var suyas = T.filas.filter(function (t) { return t.asignadoA === email && t.deleted !== 'true' && t.sugerencia !== 'pendiente' && t.sugerencia !== 'rechazada'; });
   var propiasHoy = suyas.filter(function (t) { return t.creadoPor === email && t.fecha === hoy && fechaLima(t.creado) === hoy; });
   var plan = P.fila[email + '|' + hoy];
   var horas = propiasHoy.map(function (t) { return t.creado; });

@@ -10,7 +10,7 @@
 import * as store from './store.js';
 import * as M from './modelo.js';
 import { toast, descargar } from './ui.js';
-import { hoy, addDias, pad, fmtFecha } from './util.js';
+import { hoy, addDias, pad, fmtFecha, fechaLocal } from './util.js';
 import { URL_APP } from './config.js';
 import { compromisos } from './caja-modelo.js';
 import * as EQ from './equipo-datos.js';
@@ -229,6 +229,20 @@ export function revisarAlertas() {
       if (avisados[k]) continue;
       avisados[k] = H;
       avisar({ clave: k, titulo: `📌 ${EQ.primerNombre(t.creadoPor)} te asignó un pendiente`, cuerpo: `${t.titulo}${t.fecha ? ' · ' + fmtFecha(t.fecha) : ''}`, url: '#/midia' });
+    }
+    for (const t of EQ.sugerencias()) {
+      if (t.asignadoA === yo && t.sugerencia === 'pendiente' && !t.visto) {
+        const k = `eq-sug-${t.id}`;
+        if (!avisados[k]) { avisados[k] = H; avisar({ clave: k, titulo: `💡 ${EQ.primerNombre(t.creadoPor)} te sugiere un pendiente`, cuerpo: `${t.titulo} · ¿lo tomas?`, url: '#/midia' }); }
+      }
+    }
+    // Respuesta a mis sugerencias
+    for (const t of [...EQ.sugerencias(), ...EQ.tareas()]) {
+      if (t.creadoPor !== yo || t.asignadoA === yo || !['aceptada', 'rechazada'].includes(t.sugerencia)) continue;
+      const k = `eq-resp-${t.id}-${t.sugerencia}`;
+      if (avisados[k] || fechaLocal(t.updatedAt) < addDias(H, -1)) continue;
+      avisados[k] = H;
+      avisar({ clave: k, titulo: t.sugerencia === 'aceptada' ? `✓ ${EQ.primerNombre(t.asignadoA)} tomó tu sugerencia` : `${EQ.primerNombre(t.asignadoA)}: no le corresponde`, cuerpo: `${t.titulo}${t.respuesta ? ' · ' + t.respuesta : ''}`, url: '#/midia' });
     }
   }
   // Resumen de vencidos una vez al día

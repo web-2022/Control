@@ -170,6 +170,7 @@ Cada ingeniero carga sus pendientes del día antes de la hora límite (9:00 por 
 
 - **Mi día** (`#/midia`): pendientes de hoy, lo asignado por otros, estados ○ pendiente → ◐ en curso → ✓ hecho, bloqueos y cierre del día.
 - **Panel del equipo** (`#/panel`): plan de las 9:00, avance, bloqueados y vencidos por persona; vista semanal; asignar con “tarea @nombre viernes !alta”.
+- **Sugerencias**: si alguien escucha algo que le toca a un compañero fuera de su equipo, escribe “tarea @nombre”. Le llega como *sugerencia*: la persona elige “Lo tomo” o “No me corresponde” (con motivo); su líder y el jefe la ven en el panel y pueden asignarla. No cuenta en el plan de nadie hasta que alguien la toma.
 - **Miembros** (`#/miembros`, solo jefe): invitar por enlace, aprobar solicitudes, roles (jefe / líder / ingeniero), líder de cada persona, hora límite, días laborables y correos.
 
 Servidor: `apps-script/Equipo.gs` en la cuenta de Google del jefe (Ajustes → Equipo en línea → *Crear mi equipo* guía la instalación). Cada llamada se identifica con la cuenta de Google verificada; los permisos se aplican en el servidor. Envía un correo a quien no cargó su plan, un resumen al jefe y a los líderes, y avisos de asignación (cuota gratuita de Gmail: 100 correos/día). Pensado para equipos de hasta ~30 personas.

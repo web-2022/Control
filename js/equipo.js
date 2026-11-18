@@ -74,6 +74,33 @@ function filaTarea(t, op = {}) {
     </div>`}
   </div>`;
 }
+/** Fila de una sugerencia. modo: 'recibida' | 'enviada' | 'equipo' */
+function filaSugerencia(t, modo) {
+  const de = EQ.primerNombre(t.creadoPor), para = EQ.primerNombre(t.asignadoA);
+  const dias = Math.floor((Date.now() - new Date(t.creado)) / 86400000);
+  const estado = t.sugerencia === 'pendiente'
+    ? (dias >= 1 ? `<span class="chip chip-rojo">Sin respuesta · ${dias} día${dias > 1 ? 's' : ''}</span>` : '<span class="chip chip-ambar">Esperando respuesta</span>')
+    : t.sugerencia === 'rechazada' ? `<span class="chip chip-rojo">No le corresponde${t.respuesta ? ': ' + esc(t.respuesta.slice(0, 60)) : ''}</span>`
+      : '<span class="chip chip-verde">✓ La tomó</span>';
+  const acciones = modo === 'recibida'
+    ? `<button class="btn btn-mini btn-pri" data-sug-tomar="${esc(t.id)}">Lo tomo</button><button class="btn btn-mini" data-sug-rechazar="${esc(t.id)}">No me corresponde</button>`
+    : modo === 'equipo' ? `<button class="btn btn-mini" data-sug-asignar="${esc(t.id)}">Asignar</button>` : '';
+  return `<div class="fila eq-fila eq-sug">
+    <span class="eq-est eq-sug-ic" title="Sugerencia">💡</span>
+    <div class="fila-cuerpo" data-eq-abrir="${esc(t.id)}" tabindex="0" role="button">
+      <div class="fila-tit">${esc(t.titulo)}</div>
+      <div class="fila-meta">
+        ${modo === 'recibida' ? `<span class="chip chip-azul">Sugerido por ${esc(de)}</span>` : modo === 'enviada' ? `<span class="chip">${ic('usuario')}Para ${esc(para)}</span>` : `<span class="chip">${esc(de)} → ${esc(para)}</span>`}
+        ${t.fecha ? `<span class="chip">${ic('reloj')}${esc(fmtFecha(t.fecha))}</span>` : ''}
+        ${modo === 'recibida' ? '' : estado}
+      </div>
+      ${t.nota ? `<div class="fila-com"><span>${esc(t.nota)}</span></div>` : ''}
+    </div>
+    ${acciones ? `<div class="eq-sug-acc">${acciones}</div>` : ''}
+  </div>`;
+}
+const listaSug = (l, modo) => `<div class="lista">${l.map((t) => filaSugerencia(t, modo)).join('')}</div>`;
+
 const lista = (l, vacio, op) => (l.length ? `<div class="lista">${l.map((t) => filaTarea(t, op)).join('')}</div>` : `<div class="vacio">${esc(vacio)}</div>`);
 const seccion = (titulo, n, cont, op = {}) => `<section class="seccion ${op.clase || ''}"><h3 class="seccion-tit">${op.icono ? ic(op.icono) : ''}${esc(titulo)}${n !== null ? `<span class="contador ${op.color || ''}">${n}</span>` : ''}${op.extra || ''}</h3>${cont}</section>`;
 
@@ -82,7 +109,7 @@ function enlazarFilas(el) {
   if (el.__eqFilas) return; // el contenedor de la vista se reutiliza: enlazar una sola vez
   el.__eqFilas = true;
   el.addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-eq-estado],[data-eq-abrir],[data-eq-com],[data-eq-manana]');
+    const b = e.target.closest('[data-eq-estado],[data-eq-abrir],[data-eq-com],[data-eq-manana],[data-sug-tomar],[data-sug-rechazar],[data-sug-asignar]');
     if (!b || !el.contains(b)) return;
     e.preventDefault(); e.stopPropagation();
     if (b.dataset.eqEstado) {
@@ -93,6 +120,12 @@ function enlazarFilas(el) {
       toast(sig === 'hecho' ? `✓ Hecho: ${t.titulo}` : `${ESTADOS[sig].txt}: ${t.titulo}`, sig === 'hecho' ? { texto: 'Deshacer', fn: () => EQ.guardarTarea({ id: t.id, estado: t.estado }) } : null);
     } else if (b.dataset.eqAbrir) editarTarea(b.dataset.eqAbrir);
     else if (b.dataset.eqCom) comentar(b.dataset.eqCom);
+    else if (b.dataset.sugTomar) {
+      const t = EQ.tarea(b.dataset.sugTomar);
+      await EQ.responderSugerencia(t.id, true);
+      toast(`Agregado a tus pendientes: ${t.titulo}`, { texto: 'Deshacer', fn: () => EQ.guardarTarea({ id: t.id, sugerencia: 'pendiente' }) });
+    } else if (b.dataset.sugRechazar) rechazarSugerencia(b.dataset.sugRechazar);
+    else if (b.dataset.sugAsignar) editarTarea(b.dataset.sugAsignar, {}, { reasignar: true });
     else if (b.dataset.eqManana) {
       const t = EQ.tarea(b.dataset.eqManana);
       const f = siguienteHabil(t.fecha && t.fecha > hoy() ? t.fecha : hoy());
@@ -108,7 +141,8 @@ function interpretar(texto, asignarPorDefecto) {
   let proyecto = '';
   const mp = /(?:^|\s)#([\p{L}\p{N}_.-]+)/u.exec(texto);
   if (mp) { proyecto = mp[1]; texto = texto.replace(mp[0], ' '); }
-  const personas = EQ.visibles().map((e) => ({ id: e, nombre: EQ.nombreDe(e) }));
+  const conArroba = /(^|\s)@\S/.test(texto);
+  const personas = EQ.activos().map((m) => ({ id: m.id, nombre: m.nombre }));
   const p = parsear(texto, { now: new Date(), personas, proyectos: [] });
   return {
     titulo: p.titulo || texto.trim(),
@@ -116,14 +150,24 @@ function interpretar(texto, asignarPorDefecto) {
     prioridad: p.prioridad || 'media',
     asignadoA: p.responsableId || asignarPorDefecto || EQ.miEmail(),
     conPersona: !!p.responsableId,
+    conArroba,
     proyecto,
   };
 }
 async function capturar(texto, asignarPorDefecto) {
   if (!texto.trim()) return null;
-  const { conPersona, ...d } = interpretar(texto, asignarPorDefecto);
+  const { conPersona, conArroba, ...d } = interpretar(texto, asignarPorDefecto);
+  const yo = EQ.miEmail();
+  const fueraDeMiEquipo = conPersona && d.asignadoA !== yo && !EQ.visibles().includes(d.asignadoA);
+  // A un compañero fuera de mi equipo no se le asigna: se le SUGIERE (con @nombre explícito)
+  if (fueraDeMiEquipo && conArroba) {
+    const t = await EQ.guardarTarea({ ...d, sugerencia: 'pendiente', visto: false });
+    toast(`💡 Sugerencia enviada a ${EQ.primerNombre(t.asignadoA)}. Decide si la toma; su líder también lo verá.`, { texto: 'Editar', fn: () => editarTarea(t.id) }, 7000);
+    return t;
+  }
+  if (fueraDeMiEquipo) d.asignadoA = asignarPorDefecto || yo; // "con Ana…" sin @: es tuyo
   // En el panel sin "@persona": elegir a quién se asigna
-  if (asignarPorDefecto === null && !conPersona) { editarTarea(null, { ...d, asignadoA: '' }); return null; }
+  if (asignarPorDefecto === null && (!conPersona || fueraDeMiEquipo)) { editarTarea(null, { ...d, asignadoA: '' }); return null; }
   const t = await EQ.guardarTarea({ ...d, visto: d.asignadoA === EQ.miEmail() });
   const para = t.asignadoA === EQ.miEmail() ? '' : ` → ${EQ.primerNombre(t.asignadoA)}`;
   toast(`＋ ${t.titulo}${para} · ${fmtFecha(t.fecha)}`, { texto: 'Editar', fn: () => editarTarea(t.id) }, 6000);
@@ -149,11 +193,13 @@ function enlazarCaptura(el, sel, asignarPorDefecto) {
 }
 
 // ---------------- Editor de tarea ----------------
-export function editarTarea(id, def = {}) {
+export function editarTarea(id, def = {}, op = {}) {
   const t = id ? EQ.tarea(id) : { estado: 'pendiente', prioridad: 'media', fecha: hoy(), asignadoA: EQ.miEmail(), comentarios: [], ...def };
   if (!t) { toast('Ese pendiente ya no está disponible'); return; }
   const yo = EQ.miEmail();
-  const puedoReasignar = EQ.veEquipo() && (!id || t.creadoPor === yo || EQ.visibles().includes(t.asignadoA));
+  const esSug = EQ.esSugerencia(t);
+  const puedoReasignar = EQ.veEquipo() && (!id || EQ.visibles().includes(t.asignadoA) || (t.creadoPor === yo && !esSug));
+  void op;
   const puedoBorrar = !id ? false : t.creadoPor === yo || (EQ.veEquipo() && t.asignadoA !== yo && EQ.visibles().includes(t.asignadoA));
   const opcionesPara = (t.asignadoA ? '' : '<option value="" selected disabled>— ¿A quién? —</option>') + EQ.visibles().map((e) => `<option value="${esc(e)}" ${e === t.asignadoA ? 'selected' : ''}>${esc(e === yo ? `Yo (${EQ.nombreDe(e)})` : EQ.nombreDe(e))}</option>`).join('');
   const proyectos = [...new Set(EQ.tareas().map((x) => x.proyecto).filter(Boolean))];
@@ -161,7 +207,8 @@ export function editarTarea(id, def = {}) {
   modal(id ? 'Pendiente' : 'Nuevo pendiente', `
   <form class="form form-eq" data-estado="${esc(t.estado)}">
     <label class="campo campo-full"><span>¿Qué hay que hacer?</span><input name="titulo" required value="${esc(t.titulo || '')}" ${id ? '' : 'autofocus'}></label>
-    ${id && t.creadoPor !== t.asignadoA ? `<p class="nota">Asignado por <b>${esc(EQ.nombreDe(t.creadoPor))}</b> a <b>${esc(EQ.nombreDe(t.asignadoA))}</b> · ${esc(fmtMomento(t.creado))}</p>` : ''}
+    ${esSug ? `<div class="aviso aviso-azul"><span>💡 <b>Sugerencia</b> de ${esc(EQ.nombreDe(t.creadoPor))} para ${esc(EQ.nombreDe(t.asignadoA))}${t.sugerencia === 'rechazada' ? ` · respondió: “${esc(t.respuesta || 'no le corresponde')}”` : ''}.${puedoReasignar ? ' Elige el responsable y guarda para asignarla.' : ''}</span></div>` : ''}
+    ${id && !esSug && t.creadoPor !== t.asignadoA ? `<p class="nota">Asignado por <b>${esc(EQ.nombreDe(t.creadoPor))}</b> a <b>${esc(EQ.nombreDe(t.asignadoA))}</b> · ${esc(fmtMomento(t.creado))}</p>` : ''}
     <div class="fila-campos">
       ${puedoReasignar ? `<label class="campo"><span>Responsable</span><select name="asignadoA">${opcionesPara}</select></label>` : ''}
       <label class="campo"><span>Fecha</span><input type="date" name="fecha" value="${esc(t.fecha || '')}"></label>
@@ -196,6 +243,10 @@ export function editarTarea(id, def = {}) {
       if (d.estado !== 'bloqueado') d.motivo = '';
       if (!puedoReasignar) delete d.asignadoA;
       else if (!d.asignadoA) { toast('Elige el responsable'); return; }
+      if (esSug) {
+        if (puedoReasignar) { d.sugerencia = 'asignada'; if (d.asignadoA !== t.asignadoA) d.visto = false; } // el líder decide: queda asignada
+        else if (t.asignadoA === EQ.miEmail()) d.sugerencia = 'aceptada'; // la persona la tomó
+      }
       const g = await EQ.guardarTarea({ ...(id ? { id } : {}), ...d, ...((d.asignadoA || t.asignadoA) === EQ.miEmail() ? { visto: true } : {}) });
       if (comentario) await EQ.comentarTarea(g.id, comentario);
       toast('Guardado');
@@ -205,6 +256,24 @@ export function editarTarea(id, def = {}) {
       if (!await confirmar('¿Eliminar este pendiente?', 'Eliminar', true)) return;
       await EQ.borrarTarea(id);
       toast('Eliminado', { texto: 'Deshacer', fn: () => EQ.guardarTarea({ id, deleted: false }) });
+      cerrar();
+    });
+  });
+}
+
+function rechazarSugerencia(id) {
+  const t = EQ.tarea(id);
+  if (!t) return;
+  modal('No me corresponde', `<form class="form">
+    <p class="nota"><b>${esc(t.titulo)}</b> · sugerido por ${esc(EQ.nombreDe(t.creadoPor))}</p>
+    <label class="campo campo-full"><span>¿Por qué? ¿A quién le corresponde? (lo verán ${esc(EQ.primerNombre(t.creadoPor))} y tu líder)</span>
+      <textarea name="respuesta" rows="2" required autofocus placeholder="Ej.: eso lo ve topografía (Luis)"></textarea></label>
+    <div class="acciones-modal"><span class="sep"></span><button class="btn btn-pri">Enviar</button></div>
+  </form>`, (el, cerrar) => {
+    el.querySelector('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await EQ.responderSugerencia(id, false, leerForm(e.target).respuesta);
+      toast('Respuesta enviada');
       cerrar();
     });
   });
@@ -284,7 +353,12 @@ export function vistaMiDia() {
   const ed = EQ.estadoDia(yo);
   const laborable = EQ.esDiaLaborable();
   const sem = EQ.semaforoPlan(yo);
-  const delegadas = EQ.tareas().filter((t) => t.creadoPor === yo && t.asignadoA !== yo && t.estado !== 'hecho');
+  const delegadas = EQ.tareas().filter((t) => t.creadoPor === yo && t.asignadoA !== yo && t.estado !== 'hecho' && !t.sugerencia);
+  const sugRecibidas = EQ.sugerencias().filter((t) => t.asignadoA === yo && t.sugerencia === 'pendiente');
+  const hace7 = addDias(H, -7);
+  const sugEnviadas = [...EQ.sugerencias(), ...EQ.tareas().filter((t) => t.sugerencia === 'aceptada' || t.sugerencia === 'asignada')]
+    .filter((t) => t.creadoPor === yo && t.asignadoA !== yo && (t.sugerencia === 'pendiente' || fechaLocal(t.updatedAt) >= hace7))
+    .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 
   let banner = '';
   if (laborable && !ed.planIso) {
@@ -303,13 +377,15 @@ export function vistaMiDia() {
   ${banner}
   <div class="cap-linea">
     ${ic('mas2')}
-    <input type="text" id="cap-midia" placeholder="“revisar secuencia de minado” · “enviar planos a geotecnia mañana !alta #Huaylla”" enterkeyhint="done" aria-label="Agregar pendiente de hoy">
+    <input type="text" id="cap-midia" placeholder="“revisar secuencia de minado” · “enviar planos mañana !alta” · sugerir: “cubicar tajo 450 @Ana”" enterkeyhint="done" aria-label="Agregar pendiente de hoy">
     <button class="icon-btn" data-mic="#cap-midia" title="Dictar">${ic('mic')}</button>
   </div>
   <p class="nota eq-ayuda">Toca el círculo para cambiar el estado: ○ pendiente → ◐ en curso → ✓ hecho. Toca el texto para comentar, marcar bloqueo o cambiar la fecha.</p>
+  ${sugRecibidas.length ? seccion('Te sugieren', sugRecibidas.length, listaSug(sugRecibidas, 'recibida'), { icono: 'campana', color: 'rojo', clase: 'eq-nuevas' }) : ''}
   ${nuevas.length ? seccion('Nuevos: te asignaron', nuevas.length, lista(nuevas, '', {}), { icono: 'campana', color: 'rojo', clase: 'eq-nuevas' }) : ''}
   ${seccion('Hoy', deHoy.length, lista(deHoy, laborable ? 'Agrega arriba tus pendientes de hoy' : 'Nada para hoy'), { icono: 'hoy' })}
   ${proximas.length ? seccion('Próximos días', proximas.length, lista(proximas, '', { sinMover: true }), { icono: 'calendario' }) : ''}
+  ${sugEnviadas.length ? seccion('Mis sugerencias', sugEnviadas.filter((t) => t.sugerencia === 'pendiente').length, listaSug(sugEnviadas, 'enviada'), { icono: 'enviar', extra: '<small class="eq-tit-nota">¿Escuchaste algo que le toca a otro? Escribe “tarea @nombre”</small>' }) : ''}
   ${delegadas.length ? seccion('Asignados por mí', delegadas.length, lista(delegadas.sort(ordenar), '', { para: true }), { icono: 'enviar' }) : ''}
   ${hechasHoy.length ? seccion('Hechos hoy', hechasHoy.length, lista(hechasHoy, ''), { icono: 'check', color: 'verde' }) : ''}
   ${ed.cierre ? `<section class="seccion"><h3 class="seccion-tit">${ic('lista')}Mi cierre de hoy</h3><p class="eq-cierre">${esc(ed.comentarioCierre || 'Sin comentario')}</p></section>` : ''}`;
@@ -327,7 +403,7 @@ export function vistaMiDia() {
       });
       el.querySelector('[data-cerrar-dia]').addEventListener('click', () => cerrarDia());
       // Lo nuevo que me asignaron queda "visto" al abrir Mi día
-      if (nuevas.length && document.visibilityState === 'visible') setTimeout(() => { for (const t of nuevas) EQ.guardarTarea({ id: t.id, visto: true }); }, 4000);
+      if ((nuevas.length || sugRecibidas.some((t) => !t.visto)) && document.visibilityState === 'visible') setTimeout(() => { for (const t of [...nuevas, ...sugRecibidas.filter((x) => !x.visto)]) EQ.guardarTarea({ id: t.id, visto: true }); }, 4000);
       if (laborable && !ed.planIso && !abiertas.length) setTimeout(() => el.querySelector('#cap-midia')?.focus(), 200);
     },
   };
@@ -418,6 +494,8 @@ export function vistaPanel() {
   const hech = est.reduce((a, x) => a + x.e.hechas, 0), tot = est.reduce((a, x) => a + x.e.total, 0);
   const delegadas = EQ.tareas().filter((t) => t.creadoPor === yo && t.asignadoA !== yo && t.estado !== 'hecho').sort(ordenar);
   const bloqueadas = EQ.tareas().filter((t) => t.estado === 'bloqueado' && t.asignadoA !== yo).sort(ordenar);
+  const sugEquipo = EQ.sugerencias().filter((t) => t.asignadoA !== yo && EQ.visibles().includes(t.asignadoA) && (t.sugerencia === 'pendiente' || fechaLocal(t.updatedAt) >= addDias(hoy(), -7)))
+    .sort((a, b) => (a.sugerencia === 'rechazada' ? 0 : 1) - (b.sugerencia === 'rechazada' ? 0 : 1) || (a.creado || '').localeCompare(b.creado || ''));
 
   // Grupos: el jefe ve cada líder con su equipo; el líder, su equipo
   let grupos = '';
@@ -455,6 +533,7 @@ export function vistaPanel() {
     <button class="icon-btn" data-mic="#cap-asignar" title="Dictar">${ic('mic')}</button>
   </div>
   ${modoSemana ? semanaHtml(equipo) : grupos}
+  ${sugEquipo.length ? seccion('Sugerencias entre compañeros', sugEquipo.length, listaSug(sugEquipo, 'equipo'), { icono: 'campana', color: sugEquipo.some((t) => t.sugerencia === 'rechazada' || (Date.now() - new Date(t.creado)) > 86400000) ? 'rojo' : '' }) : ''}
   ${bloqueadas.length ? seccion('Bloqueados', bloqueadas.length, lista(bloqueadas, '', { para: true }), { icono: 'x', color: 'rojo' }) : ''}
   ${seccion('Asignados por mí', delegadas.length, lista(delegadas, 'Aún no asignas pendientes. Escribe arriba “tarea @nombre fecha”.', { para: true }), { icono: 'enviar' })}`}`;
 
@@ -740,7 +819,8 @@ function asistenteCrear() {
 export function contadoresEquipo() {
   if (!EQ.activo()) return { midia: 0, panel: 0 };
   const yo = EQ.miEmail();
-  const midia = EQ.tareas().filter((t) => t.asignadoA === yo && t.creadoPor !== yo && !t.visto && t.estado !== 'hecho').length;
+  const midia = EQ.tareas().filter((t) => t.asignadoA === yo && t.creadoPor !== yo && !t.visto && t.estado !== 'hecho').length
+    + EQ.sugerencias().filter((t) => t.asignadoA === yo && t.sugerencia === 'pendiente').length;
   const panel = EQ.veEquipo() && EQ.esDiaLaborable() && EQ.pasoHoraPlan() ? EQ.miEquipo().filter((m) => !EQ.estadoDia(m.id).planIso).length + (EQ.esJefe() ? EQ.solicitudes().length : 0) : 0;
   return { midia, panel };
 }

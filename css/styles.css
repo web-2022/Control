@@ -805,3 +805,7 @@ em.defecto { font-style: normal; font-size: 11px; color: var(--acento); font-wei
   .eq-rejilla { grid-template-columns: 1fr; }
   .eq-detalle .cap-linea { margin-bottom: 10px; }
 }
+.eq-sug .eq-sug-ic { border-style: dashed; border-color: var(--azul); cursor: default; font-size: 14px; }
+.eq-sug-acc { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.eq-tit-nota { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--tenue); font-size: 12px; }
+@media (max-width: 860px) { .eq-sug { flex-wrap: wrap; } .eq-sug-acc { width: 100%; } .eq-tit-nota { display: none; } }
