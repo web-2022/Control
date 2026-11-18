@@ -110,10 +110,12 @@ export const miEquipo = () => visibles().filter((e) => e !== miEmail()).map(miem
  * Estado del día de una persona.
  * Plan cargado = primera tarea propia creada hoy para hoy, o "Confirmar plan".
  */
-export function estadoDia(email, fecha = hoy()) {
-  const suyas = tareas().filter((t) => t.asignadoA === email);
+/** proyecto (opcional): cuenta solo los pendientes de ese proyecto; el plan del día es siempre de la persona. */
+export function estadoDia(email, fecha = hoy(), proyecto = '') {
+  const todas = tareas().filter((t) => t.asignadoA === email);
+  const suyas = proyecto ? todas.filter((t) => mismoProyecto(t.proyecto, proyecto)) : todas;
   const delDia = suyas.filter((t) => t.fecha === fecha || (t.estado === 'hecho' && fechaLocal(t.completado) === fecha) || (t.estado !== 'hecho' && t.fecha && t.fecha < fecha && fecha === hoy()) || (!t.fecha && t.estado !== 'hecho' && fecha === hoy()));
-  const propias = suyas.filter((t) => t.creadoPor === email && t.fecha === fecha && fechaLocal(t.creado) === fecha);
+  const propias = todas.filter((t) => t.creadoPor === email && t.fecha === fecha && fechaLocal(t.creado) === fecha);
   const p = plan(email, fecha);
   const horas = propias.map((t) => t.creado);
   if (p?.enviado) horas.push(p.enviado);
@@ -133,6 +135,26 @@ export function estadoDia(email, fecha = hoy()) {
     ultima,
   };
 }
+const normP = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+export const mismoProyecto = (a, b) => !!a && normP(a) === normP(b);
+/** Proyectos usados en el equipo (el nombre más usado de cada uno), de más a menos pendientes. */
+export function proyectosEquipo() {
+  const cuenta = new Map();
+  for (const t of tareas()) {
+    if (!t.proyecto) continue;
+    const k = normP(t.proyecto);
+    const x = cuenta.get(k) || { n: 0, nombres: {} };
+    x.n++; x.nombres[t.proyecto] = (x.nombres[t.proyecto] || 0) + 1;
+    cuenta.set(k, x);
+  }
+  return [...cuenta.values()].sort((a, b) => b.n - a.n).map((x) => Object.entries(x.nombres).sort((a, b) => b[1] - a[1])[0][0]);
+}
+/** ¿La persona tiene pendientes en ese proyecto (abiertos o cerrados en los últimos 14 días)? */
+export function trabajaEn(email, proyecto) {
+  const desde = new Date(Date.now() - 14 * 86400000).toISOString();
+  return tareas().some((t) => t.asignadoA === email && mismoProyecto(t.proyecto, proyecto) && (t.estado !== 'hecho' || (t.completado || '') >= desde));
+}
+
 /** ¿Ya pasó la hora límite del plan hoy? */
 export function pasoHoraPlan(fecha = hoy()) {
   if (fecha !== hoy()) return fecha < hoy();

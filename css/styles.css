@@ -809,3 +809,6 @@ em.defecto { font-style: normal; font-size: 11px; color: var(--acento); font-wei
 .eq-sug-acc { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .eq-tit-nota { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--tenue); font-size: 12px; }
 @media (max-width: 860px) { .eq-sug { flex-wrap: wrap; } .eq-sug-acc { width: 100%; } .eq-tit-nota { display: none; } }
+.eq-proyectos { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 0 14px; padding-bottom: 2px; }
+.eq-proy { flex: none; border: 1px solid var(--borde2); background: var(--sup); color: var(--txt2); font: 600 13px var(--fuente); padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.eq-proy.activo { background: var(--acento-suave); border-color: var(--acento); color: var(--acento); }

@@ -154,9 +154,12 @@ function interpretar(texto, asignarPorDefecto) {
     proyecto,
   };
 }
-async function capturar(texto, asignarPorDefecto) {
+async function capturar(texto, asignarPorDefecto, proyectoPorDefecto = '') {
   if (!texto.trim()) return null;
   const { conPersona, conArroba, ...d } = interpretar(texto, asignarPorDefecto);
+  if (!d.proyecto && proyectoPorDefecto) d.proyecto = proyectoPorDefecto;
+  // Usar el nombre ya existente del proyecto (Huaylla = huaylla = HUAYLLA)
+  if (d.proyecto) d.proyecto = EQ.proyectosEquipo().find((p) => EQ.mismoProyecto(p, d.proyecto)) || d.proyecto;
   const yo = EQ.miEmail();
   const fueraDeMiEquipo = conPersona && d.asignadoA !== yo && !EQ.visibles().includes(d.asignadoA);
   // A un compañero fuera de mi equipo no se le asigna: se le SUGIERE (con @nombre explícito)
@@ -173,11 +176,11 @@ async function capturar(texto, asignarPorDefecto) {
   toast(`＋ ${t.titulo}${para} · ${fmtFecha(t.fecha)}`, { texto: 'Editar', fn: () => editarTarea(t.id) }, 6000);
   return t;
 }
-function enlazarCaptura(el, sel, asignarPorDefecto) {
+function enlazarCaptura(el, sel, asignarPorDefecto, proyectoPorDefecto = () => '') {
   const inp = el.querySelector(sel);
   if (!inp) return;
   inp.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && inp.value.trim()) { const v = inp.value; inp.value = ''; await capturar(v, typeof asignarPorDefecto === 'function' ? asignarPorDefecto() : asignarPorDefecto); }
+    if (e.key === 'Enter' && inp.value.trim()) { const v = inp.value; inp.value = ''; await capturar(v, typeof asignarPorDefecto === 'function' ? asignarPorDefecto() : asignarPorDefecto, proyectoPorDefecto()); }
   });
   el.querySelector(`[data-mic="${sel}"]`)?.addEventListener('click', async () => {
     const { escuchar, vozDisponible } = await import('./voz.js');
@@ -186,7 +189,7 @@ function enlazarCaptura(el, sel, asignarPorDefecto) {
     inp.placeholder = 'Escuchando…';
     escuchar({
       onParcial: (t) => { inp.value = t; },
-      onFin: async () => { inp.placeholder = ph; if (inp.value.trim()) { const v = inp.value; inp.value = ''; await capturar(v, typeof asignarPorDefecto === 'function' ? asignarPorDefecto() : asignarPorDefecto); } },
+      onFin: async () => { inp.placeholder = ph; if (inp.value.trim()) { const v = inp.value; inp.value = ''; await capturar(v, typeof asignarPorDefecto === 'function' ? asignarPorDefecto() : asignarPorDefecto, proyectoPorDefecto()); } },
       onError: (m) => { inp.placeholder = ph; toast(m); },
     });
   });
@@ -439,9 +442,10 @@ function cerrarDia() {
 //  PANEL DEL EQUIPO (jefe y líderes)
 // ============================================================
 let modoSemana = false;
+let filtroProyecto = ''; // Panel: ver solo un proyecto
 
 function tarjetaPersona(m) {
-  const e = EQ.estadoDia(m.id);
+  const e = EQ.estadoDia(m.id, hoy(), filtroProyecto);
   const s = EQ.semaforoPlan(m.id);
   const laborable = EQ.esDiaLaborable();
   const plan = !laborable ? '<span class="chip chip-tenue">Día no laborable</span>'
@@ -468,7 +472,7 @@ function semanaHtml(personas) {
   const dias = Array.from({ length: 7 }, (_, i) => addDias(ini, i)).filter((d) => EQ.esDiaLaborable(d));
   const celda = (m, d) => {
     if (d > hoy() || d < fechaLocal(m.creado || '') ) return '<td class="eq-fut">·</td>';
-    const e = EQ.estadoDia(m.id, d);
+    const e = EQ.estadoDia(m.id, d, filtroProyecto);
     const s = EQ.semaforoPlan(m.id, d);
     const icon = { ok: '🟢', tarde: '🟡', falta: '🔴', espera: '⚪' }[s];
     return `<td title="${s === 'ok' || s === 'tarde' ? 'Plan ' + EQ.horaCorta(e.planIso) : 'Sin plan'} · ${e.hechas}/${e.total} hechos${e.cierre ? ' · cerró el día' : ''}">${icon}<small>${e.hechas}/${e.total}</small>${e.cierre ? '<i>✓</i>' : ''}</td>`;
@@ -484,28 +488,35 @@ export function vistaPanel() {
   if (!EQ.veEquipo()) return { titulo: 'Panel', html: `${cab('Panel del equipo')}<div class="vacio vacio-grande"><b>El panel es para jefes y líderes</b><a class="btn btn-pri" href="#/midia">Ir a Mi día</a></div>` };
   const yo = EQ.miEmail();
   const cfg = EQ.configEquipo();
-  const equipo = EQ.miEquipo();
+  const proyectos = EQ.proyectosEquipo();
+  if (filtroProyecto && !proyectos.some((p) => EQ.mismoProyecto(p, filtroProyecto))) filtroProyecto = '';
+  const enFiltro = (t) => !filtroProyecto || EQ.mismoProyecto(t.proyecto, filtroProyecto);
+  const todoEquipo = EQ.miEquipo();
+  const equipo = filtroProyecto ? todoEquipo.filter((m) => EQ.trabajaEn(m.id, filtroProyecto)) : todoEquipo;
   const laborable = EQ.esDiaLaborable();
-  const est = equipo.map((m) => ({ m, e: EQ.estadoDia(m.id), s: EQ.semaforoPlan(m.id) }));
+  const est = equipo.map((m) => ({ m, e: EQ.estadoDia(m.id, hoy(), filtroProyecto), s: EQ.semaforoPlan(m.id) }));
   const conPlan = est.filter((x) => x.e.planIso).length;
   const sinPlan = est.filter((x) => !x.e.planIso);
   const bloq = est.reduce((a, x) => a + x.e.bloqueadas, 0);
   const venc = est.reduce((a, x) => a + x.e.vencidas, 0);
   const hech = est.reduce((a, x) => a + x.e.hechas, 0), tot = est.reduce((a, x) => a + x.e.total, 0);
-  const delegadas = EQ.tareas().filter((t) => t.creadoPor === yo && t.asignadoA !== yo && t.estado !== 'hecho').sort(ordenar);
-  const bloqueadas = EQ.tareas().filter((t) => t.estado === 'bloqueado' && t.asignadoA !== yo).sort(ordenar);
-  const sugEquipo = EQ.sugerencias().filter((t) => t.asignadoA !== yo && EQ.visibles().includes(t.asignadoA) && (t.sugerencia === 'pendiente' || fechaLocal(t.updatedAt) >= addDias(hoy(), -7)))
+  const delegadas = EQ.tareas().filter((t) => t.creadoPor === yo && t.asignadoA !== yo && t.estado !== 'hecho' && enFiltro(t)).sort(ordenar);
+  const bloqueadas = EQ.tareas().filter((t) => t.estado === 'bloqueado' && t.asignadoA !== yo && enFiltro(t)).sort(ordenar);
+  const sugEquipo = EQ.sugerencias().filter((t) => enFiltro(t) && t.asignadoA !== yo && EQ.visibles().includes(t.asignadoA) && (t.sugerencia === 'pendiente' || fechaLocal(t.updatedAt) >= addDias(hoy(), -7)))
     .sort((a, b) => (a.sugerencia === 'rechazada' ? 0 : 1) - (b.sugerencia === 'rechazada' ? 0 : 1) || (a.creado || '').localeCompare(b.creado || ''));
 
   // Grupos: el jefe ve cada líder con su equipo; el líder, su equipo
   let grupos = '';
   if (EQ.esJefe()) {
-    const lideres = equipo.filter((m) => m.rol === 'lider');
+    const lideres = todoEquipo.filter((m) => m.rol === 'lider');
     const enGrupo = new Set();
+    const ids = new Set(equipo.map((m) => m.id));
     for (const l of lideres) {
       const suyos = equipo.filter((m) => m.lider === l.id);
+      const grupo = [...(ids.has(l.id) ? [l] : []), ...suyos];
       suyos.forEach((m) => enGrupo.add(m.id)); enGrupo.add(l.id);
-      grupos += `<section class="seccion"><h3 class="seccion-tit">${ic('equipo')}Equipo de ${esc(l.nombre)}<span class="contador">${suyos.length + 1}</span></h3><div class="eq-rejilla">${[l, ...suyos].map(tarjetaPersona).join('')}</div></section>`;
+      if (!grupo.length) continue;
+      grupos += `<section class="seccion"><h3 class="seccion-tit">${ic('equipo')}Equipo de ${esc(l.nombre)}<span class="contador">${grupo.length}</span></h3><div class="eq-rejilla">${grupo.map(tarjetaPersona).join('')}</div></section>`;
     }
     const directos = equipo.filter((m) => !enGrupo.has(m.id));
     if (directos.length) grupos = `<section class="seccion"><h3 class="seccion-tit">${ic('equipo')}${lideres.length ? 'Directo a ti' : 'Tu equipo'}<span class="contador">${directos.length}</span></h3><div class="eq-rejilla">${directos.map(tarjetaPersona).join('')}</div></section>` + grupos;
@@ -519,7 +530,12 @@ export function vistaPanel() {
     ${EQ.esJefe() ? `<a class="btn" href="#/miembros">${ic('usuario')} Miembros</a>` : ''}`)}
   ${estadoSyncHtml()}
   ${sol.length ? `<a class="aviso aviso-azul" href="#/miembros">${ic('usuario')}<span><b>${sol.length} ${sol.length > 1 ? 'personas pidieron' : 'persona pidió'} unirse</b> al equipo. Apruébalas en Miembros.</span>${ic('flecha')}</a>` : ''}
-  ${!equipo.length ? `<div class="vacio vacio-grande">${ic('equipo')}<b>Aún no hay nadie en tu equipo</b><span>${EQ.esJefe() ? 'Invita a tus ingenieros desde Miembros: les envías un enlace por WhatsApp.' : 'Tu jefe debe asignarte personas.'}</span>${EQ.esJefe() ? '<a class="btn btn-pri" href="#/miembros">Invitar</a>' : ''}</div>` : `
+  ${proyectos.length ? `<div class="eq-proyectos" role="tablist" aria-label="Filtrar por proyecto">
+    <button class="eq-proy ${filtroProyecto ? '' : 'activo'}" data-proy="">Todos</button>
+    ${proyectos.map((p) => `<button class="eq-proy ${EQ.mismoProyecto(p, filtroProyecto) ? 'activo' : ''}" data-proy="${esc(p)}">#${esc(p)}</button>`).join('')}
+  </div>` : ''}
+  ${filtroProyecto && !equipo.length ? `<div class="vacio">Nadie tiene pendientes abiertos en #${esc(filtroProyecto)}.</div>` : ''}
+  ${!todoEquipo.length ? `<div class="vacio vacio-grande">${ic('equipo')}<b>Aún no hay nadie en tu equipo</b><span>${EQ.esJefe() ? 'Invita a tus ingenieros desde Miembros: les envías un enlace por WhatsApp.' : 'Tu jefe debe asignarte personas.'}</span>${EQ.esJefe() ? '<a class="btn btn-pri" href="#/miembros">Invitar</a>' : ''}</div>` : `
   <div class="kpis">
     <div class="kpi ${laborable && EQ.pasoHoraPlan() && sinPlan.length ? 'kpi-rojo' : ''}">${ic('hoy')}<b>${conPlan}/${equipo.length}</b><span>con plan del día</span></div>
     <div class="kpi">${ic('check')}<b>${hech}/${tot}</b><span>hechos hoy</span></div>
@@ -529,7 +545,7 @@ export function vistaPanel() {
   ${laborable && EQ.pasoHoraPlan() && sinPlan.length ? `<div class="aviso aviso-rojo">${ic('campana')}<span><b>Sin plan a las ${esc(cfg.horaPlan)}:00:</b> ${sinPlan.map((x) => esc(x.m.nombre)).join(', ')}</span></div>` : ''}
   <div class="cap-linea">
     ${ic('enviar')}
-    <input type="text" id="cap-asignar" placeholder="Asignar: “revisar costos de relleno @${esc((equipo[0]?.nombre || 'Carlos').split(' ')[0])} viernes !alta”" enterkeyhint="send" aria-label="Asignar pendiente">
+    <input type="text" id="cap-asignar" placeholder="Asignar: “revisar costos de relleno @${esc((todoEquipo[0]?.nombre || 'Carlos').split(' ')[0])} viernes !alta${filtroProyecto ? '' : ' #Proyecto'}”${filtroProyecto ? ' · en #' + esc(filtroProyecto) : ''}" enterkeyhint="send" aria-label="Asignar pendiente">
     <button class="icon-btn" data-mic="#cap-asignar" title="Dictar">${ic('mic')}</button>
   </div>
   ${modoSemana ? semanaHtml(equipo) : grupos}
@@ -541,10 +557,11 @@ export function vistaPanel() {
     titulo: 'Panel del equipo', html,
     montar(el, refrescar) {
       enlazarFilas(el);
-      enlazarCaptura(el, '#cap-asignar', () => null);
+      enlazarCaptura(el, '#cap-asignar', () => null, () => filtroProyecto);
       el.querySelector('[data-eq-sync]')?.addEventListener('click', alTocarSync);
       el.querySelectorAll('[data-persona]').forEach((b) => b.addEventListener('click', () => verPersona(b.dataset.persona)));
       el.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => { modoSemana = b.dataset.modo === 'semana'; refrescar(); }));
+      el.querySelectorAll('[data-proy]').forEach((b) => b.addEventListener('click', () => { filtroProyecto = b.dataset.proy; refrescar(); }));
     },
   };
 }
