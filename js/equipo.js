@@ -154,7 +154,7 @@ function interpretar(texto, asignarPorDefecto) {
     proyecto,
   };
 }
-async function capturar(texto, asignarPorDefecto, proyectoPorDefecto = '') {
+async function capturar(texto, asignarPorDefecto, proyectoPorDefecto = '', revisar = false) {
   if (!texto.trim()) return null;
   const { conPersona, conArroba, ...d } = interpretar(texto, asignarPorDefecto);
   if (!d.proyecto && proyectoPorDefecto) d.proyecto = proyectoPorDefecto;
@@ -162,6 +162,10 @@ async function capturar(texto, asignarPorDefecto, proyectoPorDefecto = '') {
   if (d.proyecto) d.proyecto = EQ.proyectosEquipo().find((p) => EQ.mismoProyecto(p, d.proyecto)) || d.proyecto;
   const yo = EQ.miEmail();
   const fueraDeMiEquipo = conPersona && d.asignadoA !== yo && !EQ.visibles().includes(d.asignadoA);
+  if (revisar) {
+    editarTarea(null, { ...d, asignadoA: conArroba && conPersona && !fueraDeMiEquipo ? d.asignadoA : '' }, { elegirResponsable: true });
+    return null;
+  }
   // A un compañero fuera de mi equipo no se le asigna: se le SUGIERE (con @nombre explícito)
   if (fueraDeMiEquipo && conArroba) {
     const t = await EQ.guardarTarea({ ...d, sugerencia: 'pendiente', visto: false });
@@ -176,21 +180,54 @@ async function capturar(texto, asignarPorDefecto, proyectoPorDefecto = '') {
   toast(`＋ ${t.titulo}${para} · ${fmtFecha(t.fecha)}`, { texto: 'Editar', fn: () => editarTarea(t.id) }, 6000);
   return t;
 }
-function enlazarCaptura(el, sel, asignarPorDefecto, proyectoPorDefecto = () => '') {
+export function revisarAsignacion(texto, proyecto = '') {
+  return capturar(texto, null, proyecto, true);
+}
+
+function enlazarCaptura(el, sel, asignarPorDefecto, proyectoPorDefecto = () => '', dosPasos = false) {
   const inp = el.querySelector(sel);
   if (!inp) return;
+  const continuar = el.querySelector('[data-revisar-asignacion]');
+  const mic = el.querySelector(`[data-mic="${sel}"]`);
+  const abrir = async (revisar) => {
+    const v = inp.value;
+    if (!v.trim()) { inp.focus(); return; }
+    inp.value = '';
+    await capturar(v, asignarPorDefecto, proyectoPorDefecto(), revisar);
+  };
   inp.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && inp.value.trim()) { const v = inp.value; inp.value = ''; await capturar(v, typeof asignarPorDefecto === 'function' ? asignarPorDefecto() : asignarPorDefecto, proyectoPorDefecto()); }
+    if (e.key !== 'Enter' || e.isComposing || mic?.disabled) return;
+    e.preventDefault();
+    await abrir(dosPasos && !/(^|\s)@\S/.test(inp.value));
   });
-  el.querySelector(`[data-mic="${sel}"]`)?.addEventListener('click', async () => {
-    const { escuchar, vozDisponible } = await import('./voz.js');
-    if (!vozDisponible()) { toast('Usa el micrófono del teclado'); inp.focus(); return; }
+  continuar?.addEventListener('click', () => abrir(true));
+  mic?.addEventListener('click', async () => {
+    if (mic.disabled) return;
+    mic.disabled = true;
+    if (continuar) continuar.disabled = true;
     const ph = inp.placeholder;
+    const terminar = () => {
+      inp.placeholder = ph;
+      mic.disabled = false;
+      if (continuar) continuar.disabled = false;
+    };
+    const { escuchar, vozDisponible } = await import('./voz.js');
+    if (!vozDisponible()) {
+      terminar();
+      toast('Usa el micrófono del teclado');
+      inp.focus();
+      return;
+    }
     inp.placeholder = 'Escuchando…';
     escuchar({
       onParcial: (t) => { inp.value = t; },
-      onFin: async () => { inp.placeholder = ph; if (inp.value.trim()) { const v = inp.value; inp.value = ''; await capturar(v, typeof asignarPorDefecto === 'function' ? asignarPorDefecto() : asignarPorDefecto, proyectoPorDefecto()); } },
-      onError: (m) => { inp.placeholder = ph; toast(m); },
+      onFin: async (texto) => {
+        terminar();
+        if (!texto) return;
+        inp.value = texto;
+        if (!dosPasos) await abrir(false);
+      },
+      onError: (m) => { terminar(); toast(m); },
     });
   });
 }
@@ -202,18 +239,18 @@ export function editarTarea(id, def = {}, op = {}) {
   const yo = EQ.miEmail();
   const esSug = EQ.esSugerencia(t);
   const puedoReasignar = EQ.veEquipo() && (!id || EQ.visibles().includes(t.asignadoA) || (t.creadoPor === yo && !esSug));
-  void op;
+  const elegirResponsable = !!op.elegirResponsable && puedoReasignar;
   const puedoBorrar = !id ? false : t.creadoPor === yo || (EQ.veEquipo() && t.asignadoA !== yo && EQ.visibles().includes(t.asignadoA));
   const opcionesPara = (t.asignadoA ? '' : '<option value="" selected disabled>— ¿A quién? —</option>') + EQ.visibles().map((e) => `<option value="${esc(e)}" ${e === t.asignadoA ? 'selected' : ''}>${esc(e === yo ? `Yo (${EQ.nombreDe(e)})` : EQ.nombreDe(e))}</option>`).join('');
   const proyectos = [...new Set(EQ.tareas().map((x) => x.proyecto).filter(Boolean))];
   const coms = (t.comentarios || []).map((c) => `<li><b>${esc(EQ.nombreDe(c.autor))}</b> <time>${esc(fmtMomento(c.ts))}</time><p>${esc(c.texto)}</p></li>`).join('');
-  modal(id ? 'Pendiente' : 'Nuevo pendiente', `
+  modal(elegirResponsable ? 'Asignar pendiente' : id ? 'Pendiente' : 'Nuevo pendiente', `
   <form class="form form-eq" data-estado="${esc(t.estado)}">
-    <label class="campo campo-full"><span>¿Qué hay que hacer?</span><input name="titulo" required value="${esc(t.titulo || '')}" ${id ? '' : 'autofocus'}></label>
+    <label class="campo campo-full"><span>¿Qué hay que hacer?</span><input name="titulo" required value="${esc(t.titulo || '')}" ${id || elegirResponsable ? '' : 'autofocus'}></label>
     ${esSug ? `<div class="aviso aviso-azul"><span>💡 <b>Sugerencia</b> de ${esc(EQ.nombreDe(t.creadoPor))} para ${esc(EQ.nombreDe(t.asignadoA))}${t.sugerencia === 'rechazada' ? ` · respondió: “${esc(t.respuesta || 'no le corresponde')}”` : ''}.${puedoReasignar ? ' Elige el responsable y guarda para asignarla.' : ''}</span></div>` : ''}
     ${id && !esSug && t.creadoPor !== t.asignadoA ? `<p class="nota">Asignado por <b>${esc(EQ.nombreDe(t.creadoPor))}</b> a <b>${esc(EQ.nombreDe(t.asignadoA))}</b> · ${esc(fmtMomento(t.creado))}</p>` : ''}
     <div class="fila-campos">
-      ${puedoReasignar ? `<label class="campo"><span>Responsable</span><select name="asignadoA">${opcionesPara}</select></label>` : ''}
+      ${puedoReasignar ? `<label class="campo"><span>Responsable</span><select name="asignadoA" ${elegirResponsable ? 'required autofocus' : ''}>${opcionesPara}</select></label>` : ''}
       <label class="campo"><span>Fecha</span><input type="date" name="fecha" value="${esc(t.fecha || '')}"></label>
       <label class="campo campo-corto"><span>Prioridad</span><select name="prioridad">${['alta', 'media', 'baja'].map((p) => `<option value="${p}" ${t.prioridad === p ? 'selected' : ''}>${p[0].toUpperCase() + p.slice(1)}</option>`).join('')}</select></label>
     </div>
@@ -231,7 +268,7 @@ export function editarTarea(id, def = {}, op = {}) {
     <div class="acciones-modal">
       ${puedoBorrar ? `<button type="button" class="btn btn-peligro-txt" data-borrar>${ic('basura')} Eliminar</button>` : ''}
       <span class="sep"></span>
-      <button class="btn btn-pri">Guardar</button>
+      <button class="btn btn-pri">${elegirResponsable ? 'Asignar' : 'Guardar'}</button>
     </div>
   </form>`, (el, cerrar) => {
     const f = el.querySelector('form');
@@ -545,19 +582,20 @@ export function vistaPanel() {
   ${laborable && EQ.pasoHoraPlan() && sinPlan.length ? `<div class="aviso aviso-rojo">${ic('campana')}<span><b>Sin plan a las ${esc(cfg.horaPlan)}:00:</b> ${sinPlan.map((x) => esc(x.m.nombre)).join(', ')}</span></div>` : ''}
   <div class="cap-linea">
     ${ic('enviar')}
-    <input type="text" id="cap-asignar" placeholder="Asignar: “revisar costos de relleno @${esc((todoEquipo[0]?.nombre || 'Carlos').split(' ')[0])} viernes !alta${filtroProyecto ? '' : ' #Proyecto'}”${filtroProyecto ? ' · en #' + esc(filtroProyecto) : ''}" enterkeyhint="send" aria-label="Asignar pendiente">
-    <button class="icon-btn" data-mic="#cap-asignar" title="Dictar">${ic('mic')}</button>
+    <input type="text" id="cap-asignar" placeholder="Ej.: revisar costos de relleno el viernes" enterkeyhint="next" aria-label="Describe el pendiente">
+    <button type="button" class="icon-btn" data-mic="#cap-asignar" title="Dictar" aria-label="Dictar pendiente">${ic('mic')}</button>
+    <button type="button" class="btn btn-pri" data-revisar-asignacion>Continuar</button>
   </div>
   ${modoSemana ? semanaHtml(equipo) : grupos}
   ${sugEquipo.length ? seccion('Sugerencias entre compañeros', sugEquipo.length, listaSug(sugEquipo, 'equipo'), { icono: 'campana', color: sugEquipo.some((t) => t.sugerencia === 'rechazada' || (Date.now() - new Date(t.creado)) > 86400000) ? 'rojo' : '' }) : ''}
   ${bloqueadas.length ? seccion('Bloqueados', bloqueadas.length, lista(bloqueadas, '', { para: true }), { icono: 'x', color: 'rojo' }) : ''}
-  ${seccion('Asignados por mí', delegadas.length, lista(delegadas, 'Aún no asignas pendientes. Escribe arriba “tarea @nombre fecha”.', { para: true }), { icono: 'enviar' })}`}`;
+  ${seccion('Asignados por mí', delegadas.length, lista(delegadas, 'Aún no asignas pendientes. Escribe o dicta una tarea arriba.', { para: true }), { icono: 'enviar' })}`}`;
 
   return {
     titulo: 'Panel del equipo', html,
     montar(el, refrescar) {
       enlazarFilas(el);
-      enlazarCaptura(el, '#cap-asignar', () => null, () => filtroProyecto);
+      enlazarCaptura(el, '#cap-asignar', null, () => filtroProyecto, true);
       el.querySelector('[data-eq-sync]')?.addEventListener('click', alTocarSync);
       el.querySelectorAll('[data-persona]').forEach((b) => b.addEventListener('click', () => verPersona(b.dataset.persona)));
       el.querySelectorAll('[data-modo]').forEach((b) => b.addEventListener('click', () => { modoSemana = b.dataset.modo === 'semana'; refrescar(); }));
