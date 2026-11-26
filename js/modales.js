@@ -3,6 +3,8 @@
 // ============================================================
 import * as store from './store.js';
 import * as M from './modelo.js';
+import * as EQ from './equipo-datos.js';
+import { revisarAsignacion } from './equipo.js';
 import { parsear } from './parser.js';
 import { escuchar, vozDisponible } from './voz.js';
 import { modal, toast, confirmar, leerForm } from './ui.js';
@@ -166,6 +168,7 @@ export function comentar(id, op = {}) {
 export function abrirCaptura(op = {}) {
   let detener = null;
   const conVoz = vozDisponible();
+  const puedeAsignar = EQ.veEquipo();
   const html = `
   <div class="captura">
     <div class="captura-entrada">
@@ -176,6 +179,7 @@ export function abrirCaptura(op = {}) {
     <div class="cap-preview" id="cap-preview"></div>
     <div class="acciones-modal">
       <button class="btn" id="cap-det" type="button">Más detalles…</button>
+      ${puedeAsignar ? '<button class="btn" id="cap-equipo" type="button">Asignar al equipo…</button>' : ''}
       <span class="sep"></span>
       <button class="btn" id="cap-otro" type="button">Guardar y otro</button>
       <button class="btn btn-pri" id="cap-guardar" type="button">${ic('check')} Guardar</button>
@@ -197,6 +201,7 @@ export function abrirCaptura(op = {}) {
     const prev = el.querySelector('#cap-preview');
     const est = el.querySelector('#cap-estado');
     const mic = el.querySelector('#cap-mic');
+    const asignar = el.querySelector('#cap-equipo');
     if (op.texto) ta.value = op.texto;
 
     const pintar = () => {
@@ -229,6 +234,12 @@ export function abrirCaptura(op = {}) {
     };
     el.querySelector('#cap-guardar').onclick = () => guardar(false);
     el.querySelector('#cap-otro').onclick = () => guardar(true);
+    if (asignar) asignar.onclick = () => {
+      const t = ta.value.trim();
+      if (!t) { ta.focus(); return; }
+      cerrar();
+      revisarAsignacion(t);
+    };
     el.querySelector('#cap-det').onclick = async () => {
       const t = ta.value.trim();
       detener?.();
@@ -237,7 +248,7 @@ export function abrirCaptura(op = {}) {
       else editarPendiente(null, op.extra);
     };
     ta.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); guardar(e.ctrlKey || e.metaKey); }
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); guardar(e.ctrlKey || e.metaKey); }
     });
 
     const iniciarVoz = () => {
@@ -252,7 +263,10 @@ export function abrirCaptura(op = {}) {
         onFin: () => {
           detener = null;
           mic.classList.remove('escuchando');
-          if (ta.value.trim()) { est.innerHTML = 'Revisa y pulsa <b>Guardar</b> (o corrige el texto).'; el.querySelector('#cap-guardar').focus(); }
+          if (ta.value.trim()) {
+            est.textContent = asignar ? 'Revisa el texto y elige Guardar o Asignar al equipo.' : 'Revisa el texto antes de guardar.';
+            (asignar || el.querySelector('#cap-guardar')).focus();
+          }
           else est.textContent = 'No se captó texto. Intenta de nuevo.';
         },
       });
