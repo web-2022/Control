@@ -180,6 +180,10 @@ async function capturar(texto, asignarPorDefecto, proyectoPorDefecto = '', revis
   toast(`＋ ${t.titulo}${para} · ${fmtFecha(t.fecha)}`, { texto: 'Editar', fn: () => editarTarea(t.id) }, 6000);
   return t;
 }
+export function revisarAsignacion(texto, proyecto = '') {
+  return capturar(texto, null, proyecto, true);
+}
+
 function enlazarCaptura(el, sel, asignarPorDefecto, proyectoPorDefecto = () => '', dosPasos = false) {
   const inp = el.querySelector(sel);
   if (!inp) return;
