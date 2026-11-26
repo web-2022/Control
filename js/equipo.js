@@ -520,6 +520,21 @@ function semanaHtml(personas) {
   </table><p class="nota">🟢 plan a tiempo · 🟡 plan tarde · 🔴 sin plan · número = hechos/total del día · ✓ cerró el día</p></div>`;
 }
 
+export function vistaPanelJefe(vista) {
+  if (!EQ.esJefe()) return vistaPanel();
+  const miDia = vista === 'midia';
+  const contenido = miDia ? vistaMiDia() : vistaPanel();
+  const enlace = (url, texto, actual) =>
+    `<a href="${url}" class="btn${actual ? ' btn-pri' : ''}"${actual ? ' aria-current="page"' : ''}>${texto}</a>`;
+  return {
+    ...contenido,
+    html: `<nav class="eq-proyectos" aria-label="Vistas del panel">
+      ${enlace('#/panel?vista=midia', 'Mi día', miDia)}
+      ${enlace('#/panel', 'Equipo', !miDia)}
+    </nav>${contenido.html}`,
+  };
+}
+
 export function vistaPanel() {
   if (!EQ.activo()) return noListo();
   if (!EQ.veEquipo()) return { titulo: 'Panel', html: `${cab('Panel del equipo')}<div class="vacio vacio-grande"><b>El panel es para jefes y líderes</b><a class="btn btn-pri" href="#/midia">Ir a Mi día</a></div>` };
