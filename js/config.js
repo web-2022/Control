@@ -19,4 +19,4 @@ export const NOMBRE_HOJA = 'Control – Mis datos';
 export const URL_APP = 'https://web-2022.github.io/Control/';
 
 /** Versión publicada (igual que en sw.js). */
-export const VERSION_APP = '1.9.7';
+export const VERSION_APP = '1.9.8';

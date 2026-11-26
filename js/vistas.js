@@ -1058,9 +1058,9 @@ export function vistaMas() {
       ${EQ.configurado() ? `${EQ.esJefe() ? '' : it('#/midia', 'hoy', 'Mi día (equipo)', 'Tus pendientes del día y lo que te asignaron')}${EQ.veEquipo() ? it('#/panel', 'equipo', 'Panel del equipo', 'Plan de las 9:00, avance y bloqueos') : ''}${EQ.esJefe() ? it('#/miembros', 'usuario', 'Miembros del equipo', 'Invitar, roles y reglas') : ''}` : it('#/ajustes', 'equipo', 'Equipo en línea', 'Tus ingenieros cargan su día; tú ves el estado')}
       <a class="mas-item" href="#/caja"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><circle cx="16" cy="14.5" r="1.5"/></svg><div><b>Caja</b><span>Tus ingresos y gastos (S/ y US$)</span></div>${ic('flecha')}</a>
       ${it('#/equipo', 'equipo', 'Equipo', 'Carga de trabajo y 1:1')}
-      ${it('#/proyectos', 'proyecto', 'Proyectos', 'Fases, hitos y entregables')}
+      ${it('#/proyectos', 'proyecto', 'Proyectos-Personales', 'Fases, hitos y entregables')}
       ${it('#/pendientes?vista=esperando', 'espera', 'Esperando a', 'Lo que delegaste')}
-      ${it('#/diario', 'lista', 'Diario', 'Tus cierres del día')}
+      ${it('#/diario', 'lista', 'Diario-Personales', 'Tus cierres del día')}
       ${it('#/revision', 'revision', 'Revisión semanal', 'Que no se pase nada')}
       ${it('#/ajustes', 'ajustes', 'Ajustes', 'Google Sheets, alertas, respaldo')}
       <a class="mas-item" href="#" data-compartir>${ic('enviar')}<div><b>Compartir la app</b><span>Envía el enlace a un colega</span></div>${ic('flecha')}</a>
