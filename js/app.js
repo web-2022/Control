@@ -43,7 +43,7 @@ const RUTAS = {
   mas: () => V.vistaMas(),
   bienvenida: () => vistaBienvenida(),
   midia: () => EQV.vistaMiDia(),
-  panel: () => EQV.vistaPanel(),
+  panel: (_, q) => EQV.vistaPanelJefe(q.vista),
   miembros: () => EQV.vistaMiembros(),
   unirse: (_, q) => EQV.vistaUnirse(q),
 };
@@ -54,6 +54,7 @@ function rutaActual() {
   const [camino, consulta = ''] = h.split('?');
   const [nombre, param] = camino.split('/');
   const q = Object.fromEntries(new URLSearchParams(consulta));
+  if (nombre === 'midia' && EQ.esJefe()) return { nombre: 'panel', param: null, q: { vista: 'midia' } };
   return { nombre: RUTAS[nombre] ? nombre : inicio, param: param ? decodeURIComponent(param) : null, q };
 }
 
@@ -100,7 +101,9 @@ function actualizarContadores() {
   // "Mi día" se muestra apenas se une (aunque esté esperando aprobación) para que vea su estado
   const enEquipo = EQ.configurado();
   const rol = EQ.miRol();
-  document.querySelectorAll('[data-solo-equipo]').forEach((a) => { a.hidden = !enEquipo; });
+  document.querySelectorAll('[data-solo-equipo]').forEach((a) => {
+    a.hidden = !enEquipo || (rol === 'jefe' && a.dataset.nav === 'midia');
+  });
   document.querySelectorAll('[data-solo-lider]').forEach((a) => { a.hidden = !EQ.veEquipo(); });
   // Celular: ingeniero y líder tienen "Mi día" abajo (el líder en lugar de "Hoy"; el jefe conserva "Hoy")
   document.querySelectorAll('[data-solo-ingeniero]').forEach((a) => { a.hidden = !(enEquipo && rol !== 'jefe'); });
