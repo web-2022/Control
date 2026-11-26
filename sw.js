@@ -5,7 +5,7 @@
 // NO se interceptan: van siempre directo a la red.
 // Al publicar cambios, sube el número de VERSION.
 // ============================================================
-const VERSION = 'control-v1.9.4';
+const VERSION = 'control-v1.9.5';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.json', 'css/styles.css',
   'js/app.js', 'js/store.js', 'js/sync.js', 'js/parser.js', 'js/voz.js', 'js/vistas.js',
